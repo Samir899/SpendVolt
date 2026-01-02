@@ -3,9 +3,28 @@ import Foundation
 protocol UPIParserProtocol {
     func parseUPI(url: String, key: String) -> String?
     func getBestPayeeName(from url: String) -> String
+    func isMerchantUPI(url: String) -> Bool
 }
 
 class UPIParser: UPIParserProtocol {
+    func isMerchantUPI(url: String) -> Bool {
+        let cleaned = url.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        
+        // 1. Must be a UPI pay URL
+        guard cleaned.hasPrefix("upi://pay") else {
+            return false
+        }
+        
+        // 2. Must have a payment address (pa)
+        let hasPA = cleaned.range(of: "[?&]pa=", options: .regularExpression) != nil
+        
+        // 3. Merchant QRs typically have a Merchant Category Code (mc)
+        // or a Transaction Reference (tr) / Transaction ID (tid) that are merchant-specific
+        let hasMC = cleaned.range(of: "[?&]mc=", options: .regularExpression) != nil
+        
+        return hasPA && hasMC
+    }
+
     func parseUPI(url: String, key: String) -> String? {
         let cleanedUrl = url.trimmingCharacters(in: .whitespacesAndNewlines)
         let keyPattern = key.lowercased()

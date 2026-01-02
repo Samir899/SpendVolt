@@ -121,20 +121,25 @@ struct HomeView: View {
             }
         }
         .sheet(isPresented: $isShowingScanner) {
-            ScannerView { result in
-                self.isShowingScanner = false
-                
-                if let qrAmount = viewModel.parseUPI(url: result, key: "am") {
-                    self.paymentAmount = qrAmount
-                } else {
-                    self.paymentAmount = ""
+            ScannerView(
+                completion: { result in
+                    self.isShowingScanner = false
+                    
+                    if let qrAmount = viewModel.parseUPI(url: result, key: "am") {
+                        self.paymentAmount = qrAmount
+                    } else {
+                        self.paymentAmount = ""
+                    }
+                    
+                    // Small delay to ensure scanner is fully dismissed before showing payment sheet
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        self.paymentIntent = PaymentIntent(code: result)
+                    }
+                },
+                validation: { result in
+                    viewModel.isMerchantUPI(url: result)
                 }
-                
-                // Small delay to ensure scanner is fully dismissed before showing payment sheet
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    self.paymentIntent = PaymentIntent(code: result)
-                }
-            }
+            )
         }
         .sheet(item: $paymentIntent) { intent in
             PaymentBottomSheet(

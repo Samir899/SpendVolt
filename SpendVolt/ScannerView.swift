@@ -3,10 +3,12 @@ import AVFoundation
 
 struct ScannerView: UIViewControllerRepresentable {
     var completion: (String) -> Void
+    var validation: ((String) -> Bool)? = nil
 
     func makeUIViewController(context: Context) -> ScannerViewController {
         let controller = ScannerViewController()
         controller.completion = completion
+        controller.validation = validation
         return controller
     }
 
@@ -16,6 +18,10 @@ struct ScannerView: UIViewControllerRepresentable {
         var captureSession: AVCaptureSession!
         var previewLayer: AVCaptureVideoPreviewLayer!
         var completion: ((String) -> Void)?
+        var validation: ((String) -> Bool)?
+        
+        private var isProcessing = false
+        private var errorLabel: UILabel?
 
         override func viewDidLoad() {
             super.viewDidLoad()
@@ -37,6 +43,48 @@ struct ScannerView: UIViewControllerRepresentable {
             #endif
             
             addCloseButton()
+            setupErrorLabel()
+        }
+        
+        private func setupErrorLabel() {
+            let label = UILabel()
+            label.backgroundColor = UIColor.red.withAlphaComponent(0.8)
+            label.textColor = .white
+            label.textAlignment = .center
+            label.font = .systemFont(ofSize: 14, weight: .bold)
+            label.layer.cornerRadius = 8
+            label.clipsToBounds = true
+            label.alpha = 0
+            label.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(label)
+            self.errorLabel = label
+            
+            NSLayoutConstraint.activate([
+                label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                label.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 80),
+                label.widthAnchor.constraint(equalToConstant: 280),
+                label.heightAnchor.constraint(equalToConstant: 44)
+            ])
+        }
+        
+        func showScanError(message: String) {
+            guard let label = errorLabel, label.alpha == 0 else { return }
+            
+            label.text = message
+            UIView.animate(withDuration: 0.3) {
+                label.alpha = 1
+            }
+            
+            // Vibrate for error
+            AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                UIView.animate(withDuration: 0.3) {
+                    label.alpha = 0
+                } completion: { _ in
+                    self.isProcessing = false
+                }
+            }
         }
         
         func setupCaptureSession() {
@@ -137,9 +185,18 @@ struct ScannerView: UIViewControllerRepresentable {
         }
 
         func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+            guard !isProcessing else { return }
+            
             if let metadataObject = metadataObjects.first {
                 guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else { return }
                 guard let stringValue = readableObject.stringValue else { return }
+                
+                isProcessing = true
+                
+                if let validation = self.validation, !validation(stringValue) {
+                    showScanError(message: "Invalid Merchant QR Code")
+                    return
+                }
                 
                 // Vibrate and return result
                 AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))

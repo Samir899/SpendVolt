@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpendVolt - Professional Payment Gateway LLD</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background-color: #f4f7f6;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        h1 { color: #FF6B00; border-bottom: 3px solid #FF6B00; padding-bottom: 10px; font-size: 2.2em; }
+        h2 { color: #1A1A1A; margin-top: 40px; border-left: 5px solid #FF6B00; padding-left: 15px; background: #fff5eb; padding-top: 5px; padding-bottom: 5px; }
+        h3 { color: #2c3e50; margin-top: 25px; text-decoration: underline; }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 5px solid #2196f3;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .step-box {
+            background: #ffffff;
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .highlight { color: #e65100; font-weight: bold; }
+        code {
+            background: #272822;
+            color: #f8f8f2;
+            padding: 10px;
+            border-radius: 6px;
+            display: block;
+            margin: 10px 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            overflow-x: auto;
+        }
+        .diagram {
+            background: #2d3436;
+            color: #dfe6e9;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: left;
+            font-family: 'Courier New', monospace;
+            white-space: pre;
+            overflow-x: auto;
+            line-height: 1.2;
+            margin: 20px 0;
+        }
+        .concept-card {
+            border: 1px solid #FF6B00;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .footer { margin-top: 60px; text-align: center; font-size: 0.9em; color: #95a5a6; border-top: 1px solid #eee; padding-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Professional Payment Gateway Integration LLD (SpendVolt)</h1>
+        <p>This document provides a deep dive into how modern multi-merchant applications handle payments using an <strong>Aggregator Model</strong>. It explains the end-to-end flow from scanning a QR to settlement in the merchant's bank account.</p>
+
+        <div class="info-box">
+            <strong>The Core Concept:</strong> In a professional ecosystem, the application acts as an <b>Orchestrator</b>. It doesn't move the money itself but manages the <i>Intent</i> and <i>Confirmation</i>.
+        </div>
+
+        <h2>1. The Merchant Aggregator Model</h2>
+        <p>In this model (used by top consumer apps), you don't just scan a random UPI ID. Instead:</p>
+        <ul>
+            <li>You onboard merchants (Petrol Pumps) onto your platform.</li>
+            <li>Each merchant is assigned a unique <strong>Sub-Merchant ID</strong> within your Payment Gateway (PG) account.</li>
+            <li>The PG (e.g., Razorpay/Cashfree) acts as the <b>Escrow/Settlement agent</b>.</li>
+        </ul>
+
+        <h2>2. Deep Dive: The Payment Lifecycle</h2>
+
+        <div class="diagram">
+[ APP ]             [ JAVA BACKEND ]         [ PAYMENT GATEWAY ]      [ UPI APP / BANK ]
+  |                        |                        |                        |
+  |--- 1. Scan QR -------->|                        |                        |
+  |                        |--- 2. Create Order --->|                        |
+  |                        |    (Amt: 500, Merchant)|                        |
+  |                        |                        |                        |
+  |                        |<-- 3. Intent Link -----|                        |
+  |                        |    (upi://pay?tr=...)  |                        |
+  |                        |                        |                        |
+  |<-- 4. Pass Intent Link-|                        |                        |
+  |                        |                        |                        |
+  |--- 5. Trigger Intent (GPay/PhonePe) ------------------------------------>|
+  |                        |                        |                        |
+  |                        |                        |      [ User Enters PIN ]
+  |                        |                        |            |
+  |                        |                        |<-- 6. Payment Success -|
+  |                        |                        |      (Bank Callback)   |
+  |                        |                        |                        |
+  |                        |<-- 7. Webhook (Async) -|                        |
+  |                        |    (Order Paid)        |                        |
+  |                        |                        |                        |
+  |--- 8. Poll Status ---->|                        |                        |
+  |                        |--- 9. Update DB -------|                        |
+  |<-- 10. Show Success ---|                        |                        |
+  |                        |                        |                        |
+        </div>
+
+        <h2>3. Detailed Phase Explanation</h2>
+
+        <div class="step-box">
+            <h3>Phase 1: Order Creation (The Handshake)</h3>
+            <p>When the user scans the QR and enters the amount, your Java Backend calls the PG's <b>Order API</b>. You provide:</p>
+            <ul>
+                <li><code>amount</code>: The value to be charged.</li>
+                <li><code>receipt</code>: Your internal transaction ID.</li>
+                <li><code>notes</code>: Metadata like Pump ID, Fuel Type, etc.</li>
+            </ul>
+            <p><span class="highlight">Result:</span> The PG creates an "unpaid" record and generates a <b>UPI Intent URL</b>.</p>
+        </div>
+
+        <div class="step-box">
+            <h3>Phase 2: Intent Invocation (The Handover)</h3>
+            <p>The <b>UPI Intent URL</b> is the "magic string." It contains a <code>tr</code> (Transaction Reference) which is unique to this PG order.</p>
+            <code>
+                upi://pay?pa=aggregator@bank&pn=SpendVolt&am=500&tr=PG_TXN_9988&cu=INR
+            </code>
+            <p>When your app opens this link, the UPI App (GPay) knows exactly where the money goes and which order it belongs to.</p>
+        </div>
+
+        <div class="step-box">
+            <h3>Phase 3: The Webhook (Asynchronous Confirmation)</h3>
+            <p>This is the most critical part for a Java Developer. Once the user pays, the bank tells the PG. The PG then sends an HTTP POST request (a <b>Webhook</b>) to your server.</p>
+            <p><span class="highlight">Why Webhooks?</span> Because the user might close the app or lose internet after paying. The Webhook ensures your backend knows the payment happened regardless of the app's state.</p>
+        </div>
+
+        <div class="step-box">
+            <h3>Phase 4: Reconciliation & Settlement</h3>
+            <p>After the payment is successful, the money resides in the PG's <b>Node Account</b>. Depending on your configuration:</p>
+            <ul>
+                <li><strong>Auto-Settlement:</strong> PG sends the money to the Merchant's bank account in T+1 days.</li>
+                <li><strong>Split Settlement:</strong> PG sends ₹490 to the Merchant and ₹10 (your commission) to your bank account.</li>
+            </ul>
+        </div>
+
+        <h2>4. The "Tracking Only" Model vs. Gateway Model</h2>
+        <div class="concept-card">
+            <p><strong>Tracking Only (Utility App):</strong> You don't manage money. You scan random QRs, user pays directly to merchant, and you manually "log" the expense based on user confirmation. <i>(Low Risk, No Revenue from transactions)</i></p>
+            <hr>
+            <p><strong>Gateway Model (Fintech Platform):</strong> You manage the flow. Money flows through your Gateway. You have 100% verified data and can charge commissions. <i>(High Value, Requires PG integration)</i></p>
+        </div>
+
+        <h2>5. Java Backend: Key Responsibilities</h2>
+        <ul>
+            <li><strong>Signature Verification:</strong> Use the PG's secret key to verify that Webhooks are actually coming from them.</li>
+            <li><strong>Idempotency:</strong> Ensure that if you receive the same Webhook twice, you don't record the payment twice.</li>
+            <li><strong>State Machine:</strong> Manage transaction states: <code>CREATED</code> -> <code>PENDING</code> -> <code>AUTHORIZED</code> -> <code>CAPTURED</code>.</li>
+        </ul>
+
+        <div class="footer">
+            &copy; 2025 SpendVolt Energy Solutions - Professional LLD Architecture
+        </div>
+    </div>
+</body>
+</html>
