@@ -2,13 +2,38 @@ import Foundation
 
 struct UserProfile: Codable {
     var name: String
-    var currency: String
+    var currency: Currency
     var monthlyBudget: Double
     var energyType: EnergyType
     var defaultPaymentApp: String
     var budgetWarningThreshold: Double // 0.0 to 1.0
     var monthlyResetDay: Int // 1 to 31
     
+    enum Currency: String, Codable, CaseIterable, Identifiable {
+        case INR = "₹"
+        case USD = "$"
+        case EUR = "€"
+        case GBP = "£"
+        
+        var id: String { self.rawValue }
+        var code: String { String(describing: self) }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            if let match = Currency.allCases.first(where: { $0.code == value || $0.rawValue == value }) {
+                self = match
+            } else {
+                self = .INR
+            }
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(self.code)
+        }
+    }
+
     enum EnergyType: String, Codable, CaseIterable, Identifiable {
         case petrol = "Petrol"
         case diesel = "Diesel"
@@ -28,7 +53,7 @@ struct UserProfile: Codable {
     
     static let `default` = UserProfile(
         name: "User",
-        currency: "INR",
+        currency: .INR,
         monthlyBudget: 10000,
         energyType: .petrol,
         defaultPaymentApp: "Google Pay",

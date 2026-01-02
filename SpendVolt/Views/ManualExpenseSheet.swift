@@ -25,7 +25,7 @@ struct ManualExpenseSheet: View {
                                 .tracking(1.2)
                             
                             HStack {
-                                Text("₹")
+                                Text(viewModel.currencySymbol)
                                     .font(.system(size: 40, weight: .bold, design: .rounded))
                                     .foregroundColor(Theme.textPrimary)
                                 

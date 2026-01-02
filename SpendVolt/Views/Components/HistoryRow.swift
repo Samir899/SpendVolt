@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HistoryRow: View {
     let transaction: Transaction
+    let currencySymbol: String
     let categories: [UserCategory]
     var onUpdateCategory: ((String) -> Void)? = nil
     
@@ -51,7 +52,7 @@ struct HistoryRow: View {
             Spacer()
             
             VStack(alignment: .trailing, spacing: 4) {
-                Text(Theme.formatCurrency(transaction.amount))
+                Text(Theme.formatCurrency(transaction.amount, symbol: currencySymbol))
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .strikethrough(transaction.status == .failure)
                     .foregroundColor(transaction.status == .failure ? Theme.textTertiary : Theme.textPrimary)

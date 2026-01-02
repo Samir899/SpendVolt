@@ -7,6 +7,7 @@ struct ProfileView: View {
     @State private var name: String = ""
     @State private var monthlyBudget: String = ""
     @State private var energyType: UserProfile.EnergyType = .petrol
+    @State private var currency: UserProfile.Currency = .INR
     @State private var defaultPaymentApp: String = "Google Pay"
     @State private var warningThreshold: Double = 0.8
     @State private var resetDay: Int = 1
@@ -27,7 +28,7 @@ struct ProfileView: View {
                 
                 Section("Financial Goals") {
                     HStack {
-                        Image(systemName: "indianrupeesign.circle.fill")
+                        Image(systemName: "banknote.fill")
                             .foregroundColor(Theme.primary)
                             .frame(width: 24)
                         Text("Monthly Budget")
@@ -59,6 +60,12 @@ struct ProfileView: View {
                 }
                 
                 Section("Preferences") {
+                    Picker("Currency", selection: $currency) {
+                        ForEach(UserProfile.Currency.allCases) { curr in
+                            Text("\(curr.code) (\(curr.rawValue))").tag(curr)
+                        }
+                    }
+                    
                     Picker("Energy Type", selection: $energyType) {
                         ForEach(UserProfile.EnergyType.allCases) { type in
                             HStack {
@@ -99,6 +106,7 @@ struct ProfileView: View {
         name = viewModel.profile.name
         monthlyBudget = String(format: "%.0f", viewModel.profile.monthlyBudget)
         energyType = viewModel.profile.energyType
+        currency = viewModel.profile.currency
         defaultPaymentApp = viewModel.profile.defaultPaymentApp
         warningThreshold = viewModel.profile.budgetWarningThreshold
         resetDay = viewModel.profile.monthlyResetDay
@@ -108,6 +116,7 @@ struct ProfileView: View {
         viewModel.profile.name = name
         viewModel.profile.monthlyBudget = Double(monthlyBudget) ?? 0
         viewModel.profile.energyType = energyType
+        viewModel.profile.currency = currency
         viewModel.profile.defaultPaymentApp = defaultPaymentApp
         viewModel.profile.budgetWarningThreshold = warningThreshold
         viewModel.profile.monthlyResetDay = resetDay

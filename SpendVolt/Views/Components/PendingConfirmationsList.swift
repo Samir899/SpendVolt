@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PendingConfirmationsList: View {
     let transactions: [Transaction]
+    let currencySymbol: String
     let categories: [UserCategory]
     let onUpdateCategory: (String, String) -> Void
     let onConfirm: (Transaction) -> Void
@@ -28,6 +29,7 @@ struct PendingConfirmationsList: View {
                     ForEach(transactions) { txn in
                         PendingCard(
                             transaction: txn,
+                            currencySymbol: currencySymbol,
                             categories: categories,
                             onUpdateCategory: { newCategory in
                                 onUpdateCategory(txn.id, newCategory)

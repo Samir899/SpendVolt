@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PendingCard: View {
     let transaction: Transaction
+    let currencySymbol: String
     let categories: [UserCategory]
     var onUpdateCategory: ((String) -> Void)? = nil
     let onConfirm: () -> Void
@@ -43,7 +44,7 @@ struct PendingCard: View {
                 
                 Spacer()
                 
-                Text(Theme.formatCurrency(transaction.amount))
+                Text(Theme.formatCurrency(transaction.amount, symbol: currencySymbol))
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(Theme.textPrimary)
             }

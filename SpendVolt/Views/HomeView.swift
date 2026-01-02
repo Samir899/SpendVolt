@@ -36,6 +36,7 @@ struct HomeView: View {
                             HomeSummaryCard(
                                 spent: viewModel.totalSpentThisMonth,
                                 budget: viewModel.profile.monthlyBudget,
+                                currencySymbol: viewModel.currencySymbol,
                                 threshold: viewModel.profile.budgetWarningThreshold * viewModel.profile.monthlyBudget,
                                 insight: viewModel.dailyInsight
                             )
@@ -50,6 +51,7 @@ struct HomeView: View {
                         if !viewModel.topThreeSpends.isEmpty {
                             TopSpendsList(
                                 topSpends: viewModel.topThreeSpends,
+                                currencySymbol: viewModel.currencySymbol,
                                 categories: viewModel.categories
                             )
                         }
@@ -58,6 +60,7 @@ struct HomeView: View {
                         if !viewModel.pendingTransactions.isEmpty {
                             PendingConfirmationsList(
                                 transactions: viewModel.pendingTransactions,
+                                currencySymbol: viewModel.currencySymbol,
                                 categories: viewModel.categories,
                                 onUpdateCategory: { id, category in
                                     viewModel.updateTransactionCategory(id: id, newCategoryName: category)
@@ -101,6 +104,7 @@ struct HomeView: View {
                 if isProcessingPayment, let txn = processingTransaction {
                     ProcessingOverlay(
                         transaction: txn,
+                        currencySymbol: viewModel.currencySymbol,
                         onVerify: { 
                             viewModel.confirmTransaction(txn.id)
                             withAnimation(.spring()) { self.isProcessingPayment = false }

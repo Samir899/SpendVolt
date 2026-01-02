@@ -21,6 +21,14 @@ class AppViewModel: ObservableObject {
     @Published var showErrorAlert = false
     @Published var isAuthenticated = false
     
+    var currencySymbol: String {
+        profile.currency.rawValue
+    }
+    
+    func formatCurrency(_ amount: Double) -> String {
+        Theme.formatCurrency(amount, symbol: currencySymbol)
+    }
+    
     private let storageService: StorageServiceProtocol
     private let paymentService: PaymentServiceProtocol
     private let networkService: NetworkServiceProtocol

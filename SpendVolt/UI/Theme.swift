@@ -42,9 +42,9 @@ enum Theme {
         return formatter
     }()
 
-    static func formatCurrency(_ amount: Double) -> String {
+    static func formatCurrency(_ amount: Double, symbol: String) -> String {
         let numberString = currencyFormatter.string(from: NSNumber(value: amount)) ?? String(format: "%.2f", amount)
-        return "₹" + numberString
+        return symbol + numberString
     }
 }
 

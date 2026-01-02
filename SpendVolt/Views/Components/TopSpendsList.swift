@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TopSpendsList: View {
     let topSpends: [Transaction]
+    let currencySymbol: String
     let categories: [UserCategory]
     
     var body: some View {
@@ -38,7 +39,7 @@ struct TopSpendsList: View {
                         
                         Spacer()
                         
-                        Text(Theme.formatCurrency(Double(txn.amount) ?? 0))
+                        Text(Theme.formatCurrency(Double(txn.amount), symbol: currencySymbol))
                             .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
                     }

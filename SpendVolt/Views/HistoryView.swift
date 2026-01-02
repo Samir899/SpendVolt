@@ -26,6 +26,7 @@ struct HistoryView: View {
                             if showingAnalytics {
                                 AnalyticsSection(
                                     selectedPeriod: $selectedPeriod,
+                                    currencySymbol: viewModel.currencySymbol,
                                     fullSpendingData: viewModel.categorySpending(for: selectedPeriod),
                                     chartData: viewModel.groupedCategorySpending(for: selectedPeriod),
                                     categories: viewModel.categories
@@ -42,7 +43,11 @@ struct HistoryView: View {
                                 
                                 LazyVStack(spacing: 16) {
                                     ForEach(completedTransactions) { txn in
-                                        HistoryRow(transaction: txn, categories: viewModel.categories) { newCategory in
+                                        HistoryRow(
+                                            transaction: txn,
+                                            currencySymbol: viewModel.currencySymbol,
+                                            categories: viewModel.categories
+                                        ) { newCategory in
                                             withAnimation {
                                                 viewModel.updateTransactionCategory(id: txn.id, newCategoryName: newCategory)
                                             }

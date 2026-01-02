@@ -49,7 +49,7 @@ struct PaymentBottomSheet: View {
                 // MARK: - Amount Input
                 VStack(spacing: 12) {
                     HStack {
-                        Text("₹")
+                        Text(viewModel.currencySymbol)
                             .font(.system(size: 40, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
                         

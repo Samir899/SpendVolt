@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProcessingOverlay: View {
     let transaction: Transaction
+    let currencySymbol: String
     let onVerify: () -> Void
     let onFail: () -> Void
     let onWait: () -> Void
@@ -30,7 +31,7 @@ struct ProcessingOverlay: View {
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
                         
-                        Text("Did you finish paying \(Theme.formatCurrency(transaction.amount)) at \(transaction.merchantName)?")
+                        Text("Did you finish paying \(Theme.formatCurrency(transaction.amount, symbol: currencySymbol)) at \(transaction.merchantName)?")
                             .font(.system(size: 16))
                             .multilineTextAlignment(.center)
                             .foregroundColor(Theme.textSecondary)

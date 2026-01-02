@@ -3,6 +3,7 @@ import Charts
 
 struct AnalyticsSection: View {
     @Binding var selectedPeriod: AppViewModel.AnalysisPeriod
+    let currencySymbol: String
     let fullSpendingData: [CategorySpending]
     let chartData: [CategorySpending]
     let categories: [UserCategory]
@@ -41,7 +42,7 @@ struct AnalyticsSection: View {
                         .foregroundStyle(Theme.primary.gradient)
                         .cornerRadius(4)
                         .annotation(position: .trailing) {
-                            Text(Theme.formatCurrency(item.totalAmount))
+                            Text(Theme.formatCurrency(item.totalAmount, symbol: currencySymbol))
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(Theme.textSecondary)
                         }
@@ -83,7 +84,7 @@ struct AnalyticsSection: View {
                             Spacer()
                             
                             VStack(alignment: .trailing, spacing: 2) {
-                                Text(Theme.formatCurrency(item.totalAmount))
+                                Text(Theme.formatCurrency(item.totalAmount, symbol: currencySymbol))
                                     .font(.system(size: 14, weight: .bold))
                                 Text("\(Int(item.percentage))%")
                                     .font(.system(size: 10))
