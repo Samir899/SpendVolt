@@ -51,7 +51,7 @@ struct HistoryRow: View {
             Spacer()
             
             VStack(alignment: .trailing, spacing: 4) {
-                Text(Theme.formatCurrency(Double(transaction.amount) ?? 0))
+                Text(Theme.formatCurrency(transaction.amount))
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .strikethrough(transaction.status == .failure)
                     .foregroundColor(transaction.status == .failure ? Theme.textTertiary : Theme.textPrimary)

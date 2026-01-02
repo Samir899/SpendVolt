@@ -22,6 +22,7 @@ struct HomeHeaderView: View {
                     .font(.system(size: 32))
                     .foregroundColor(Theme.primary)
             }
+            .buttonStyle(ScaleButtonStyle())
         }
         .padding(.horizontal, Theme.horizontalPadding)
         .padding(.top, 10)

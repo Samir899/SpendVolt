@@ -5,6 +5,8 @@ struct HistoryView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var showingAnalytics = false
     @State private var selectedPeriod: AppViewModel.AnalysisPeriod = .month
+    @State private var transactionToDelete: String?
+    @State private var isShowingDeleteConfirmation = false
     
     var completedTransactions: [Transaction] {
         viewModel.transactions.filter { $0.status != .pending }
@@ -45,6 +47,14 @@ struct HistoryView: View {
                                                 viewModel.updateTransactionCategory(id: txn.id, newCategoryName: newCategory)
                                             }
                                         }
+                                        .contextMenu {
+                                            Button(role: .destructive) {
+                                                self.transactionToDelete = txn.id
+                                                self.isShowingDeleteConfirmation = true
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                        }
                                     }
                                 }
                                 .padding(.horizontal, Theme.horizontalPadding)
@@ -56,6 +66,16 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("Expense History")
+            .alert("Delete Transaction", isPresented: $isShowingDeleteConfirmation) {
+                Button("Delete", role: .destructive) {
+                    if let id = transactionToDelete {
+                        viewModel.deleteTransaction(id)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Are you sure you want to delete this transaction? This action cannot be undone.")
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {

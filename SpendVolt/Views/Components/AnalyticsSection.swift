@@ -41,7 +41,7 @@ struct AnalyticsSection: View {
                         .foregroundStyle(Theme.primary.gradient)
                         .cornerRadius(4)
                         .annotation(position: .trailing) {
-                            Text(Theme.formatCurrency(item.totalAmount, decimalPlaces: 0))
+                            Text(Theme.formatCurrency(item.totalAmount))
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(Theme.textSecondary)
                         }
@@ -83,7 +83,7 @@ struct AnalyticsSection: View {
                             Spacer()
                             
                             VStack(alignment: .trailing, spacing: 2) {
-                                Text(Theme.formatCurrency(item.totalAmount, decimalPlaces: 0))
+                                Text(Theme.formatCurrency(item.totalAmount))
                                     .font(.system(size: 14, weight: .bold))
                                 Text("\(Int(item.percentage))%")
                                     .font(.system(size: 10))

@@ -109,6 +109,7 @@ struct ManualExpenseSheet: View {
                                 .cornerRadius(18)
                                 .shadow(color: Theme.primary.opacity(0.3), radius: 10, y: 5)
                         }
+                        .buttonStyle(ScaleButtonStyle())
                         .disabled(merchantName.isEmpty || amount.isEmpty)
                         .padding(.horizontal, Theme.horizontalPadding)
                         .padding(.bottom, 40)

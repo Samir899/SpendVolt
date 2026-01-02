@@ -16,7 +16,7 @@ class AnalyticsEngine: AnalyticsEngineProtocol {
                 let y = Calendar.current.component(.year, from: $0.date)
                 return m == month && y == year
             }
-            .compactMap { Double($0.amount) }
+            .map { $0.amount }
             .reduce(0, +)
     }
     
@@ -28,7 +28,7 @@ class AnalyticsEngine: AnalyticsEngineProtocol {
                 let y = Calendar.current.component(.year, from: $0.date)
                 return m == month && y == year
             }
-            .sorted { (Double($0.amount) ?? 0) > (Double($1.amount) ?? 0) }
+            .sorted { $0.amount > $1.amount }
             .prefix(limit)
             .map { $0 }
     }
@@ -73,13 +73,12 @@ class AnalyticsEngine: AnalyticsEngineProtocol {
             .filter { $0.status == .success }
             .filter { $0.date >= startDate && $0.date <= now }
         
-        let total = periodTransactions.compactMap { Double($0.amount) }.reduce(0, +)
+        let total = periodTransactions.map { $0.amount }.reduce(0, +)
         guard total > 0 else { return [] }
         
         var grouping: [String: Double] = [:]
         for txn in periodTransactions {
-            let amt = Double(txn.amount) ?? 0
-            grouping[txn.categoryName, default: 0] += amt
+            grouping[txn.categoryName, default: 0] += txn.amount
         }
         
         return grouping.map { name, amount in

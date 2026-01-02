@@ -2,6 +2,7 @@ import Foundation
 
 struct UserProfile: Codable {
     var name: String
+    var currency: String
     var monthlyBudget: Double
     var energyType: EnergyType
     var defaultPaymentApp: String
@@ -27,6 +28,7 @@ struct UserProfile: Codable {
     
     static let `default` = UserProfile(
         name: "User",
+        currency: "INR",
         monthlyBudget: 10000,
         energyType: .petrol,
         defaultPaymentApp: "Google Pay",

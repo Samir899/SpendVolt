@@ -3,9 +3,9 @@ import SwiftUI
 struct PendingConfirmationsList: View {
     let transactions: [Transaction]
     let categories: [UserCategory]
-    let onUpdateCategory: (UUID, String) -> Void
+    let onUpdateCategory: (String, String) -> Void
     let onConfirm: (Transaction) -> Void
-    let onDelete: (UUID) -> Void
+    let onDelete: (String) -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -24,7 +24,7 @@ struct PendingConfirmationsList: View {
             .padding(.horizontal, Theme.horizontalPadding)
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
+                HStack(spacing: 16) { // Reverted to regular HStack for stable hit-testing
                     ForEach(transactions) { txn in
                         PendingCard(
                             transaction: txn,
@@ -35,12 +35,14 @@ struct PendingConfirmationsList: View {
                             onConfirm: { onConfirm(txn) },
                             onDelete: { onDelete(txn.id) }
                         )
-                        .frame(width: 300)
+                        .frame(width: 280)
                     }
                 }
                 .padding(.horizontal, Theme.horizontalPadding)
                 .padding(.bottom, 10)
+                .scrollTargetLayout()
             }
+            .scrollTargetBehavior(.viewAligned)
         }
     }
 }

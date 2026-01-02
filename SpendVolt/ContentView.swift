@@ -1,43 +1,29 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var viewModel = AppViewModel()
-    @State private var selectedTab = 0
+    @StateObject private var sessionManager = SessionManager.shared
+    @State private var initialDashboard: AppDashboard?
 
     init() {
-        // Customize TabBar appearance
-        let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor.systemBackground
-        
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
+        // ... existing init ...
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            HomeView(viewModel: viewModel)
-                .tabItem {
-                    Label("Home", systemImage: selectedTab == 0 ? "house.fill" : "house")
-                }
-                .tag(0)
-            
-            HistoryView(viewModel: viewModel)
-                .tabItem {
-                    Label("Expenses", systemImage: selectedTab == 1 ? "clock.arrow.circlepath" : "clock")
-                }
-                .tag(1)
-            
-            SettingsView(viewModel: viewModel)
-                .tabItem {
-                    Label("Settings", systemImage: selectedTab == 2 ? "gearshape.fill" : "gearshape")
-                }
-                .tag(2)
+        ZStack {
+            if sessionManager.isAuthenticated {
+                // The heavy AppViewModel and all its data are ONLY created here
+                MainAppView(initialDashboard: initialDashboard)
+                    .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .opacity))
+            } else {
+                // Login flow is isolated and lightweight
+                LoginView(onLoginSuccess: { response in
+                    self.initialDashboard = response.dashboard
+                    withAnimation(.spring()) {
+                        sessionManager.saveSession(token: response.accessToken, username: response.username)
+                    }
+                })
+                .transition(.asymmetric(insertion: .opacity, removal: .move(edge: .leading)))
+            }
         }
-        .accentColor(Theme.primary)
     }
-}
-
-#Preview {
-    ContentView()
 }

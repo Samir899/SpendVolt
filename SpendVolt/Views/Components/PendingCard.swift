@@ -43,13 +43,16 @@ struct PendingCard: View {
                 
                 Spacer()
                 
-                Text(Theme.formatCurrency(Double(transaction.amount) ?? 0))
+                Text(Theme.formatCurrency(transaction.amount))
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(Theme.textPrimary)
             }
             
             HStack(spacing: 12) {
-                Button(action: onDelete) {
+                // Delete Button
+                Button(action: {
+                    onDelete()
+                }) {
                     HStack {
                         Image(systemName: "trash")
                         Text("Delete")
@@ -57,12 +60,16 @@ struct PendingCard: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.red)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 40)
+                    .frame(height: 44)
                     .background(Color.red.opacity(0.08))
                     .cornerRadius(10)
                 }
+                .buttonStyle(ScaleButtonStyle())
                 
-                Button(action: onConfirm) {
+                // Verify Button
+                Button(action: {
+                    onConfirm()
+                }) {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
                         Text("Verify")
@@ -70,10 +77,11 @@ struct PendingCard: View {
                     .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 40)
+                    .frame(height: 44)
                     .background(Theme.primary)
                     .cornerRadius(10)
                 }
+                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(16)

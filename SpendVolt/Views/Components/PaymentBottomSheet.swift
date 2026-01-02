@@ -167,6 +167,7 @@ struct CategoryChip: View {
                     .stroke(isSelected ? Color.clear : Theme.tertiaryBackground, lineWidth: 1)
             )
         }
+        .buttonStyle(ScaleButtonStyle())
     }
 }
 
@@ -222,5 +223,6 @@ struct PaymentAppRow: View {
                     .stroke(isDefault ? Theme.primary.opacity(0.3) : Color.clear, lineWidth: 1)
             )
         }
+        .buttonStyle(ScaleButtonStyle())
     }
 }

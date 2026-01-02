@@ -32,16 +32,56 @@ enum Theme {
     }
 
     // MARK: - Formatters
-    static func formatCurrency(_ amount: Double, decimalPlaces: Int = 2) -> String {
+    private static let currencyFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = decimalPlaces
-        formatter.maximumFractionDigits = decimalPlaces
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
         formatter.groupingSeparator = ","
         formatter.groupingSize = 3
-        
-        let numberString = formatter.string(from: NSNumber(value: amount)) ?? "\(amount)"
+        return formatter
+    }()
+
+    static func formatCurrency(_ amount: Double) -> String {
+        let numberString = currencyFormatter.string(from: NSNumber(value: amount)) ?? String(format: "%.2f", amount)
         return "₹" + numberString
+    }
+}
+
+// MARK: - Professional UI Components
+struct ErrorBanner: View {
+    let message: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.red)
+                .font(.system(size: 20))
+            
+            Text(message)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(Theme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            
+            Spacer()
+        }
+        .padding()
+        .background(Color.red.opacity(0.05))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.red.opacity(0.1), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Custom Button Styles
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 

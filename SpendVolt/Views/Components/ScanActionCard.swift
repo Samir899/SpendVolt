@@ -34,6 +34,6 @@ struct ScanActionCard: View {
                 .shadow(color: Theme.primary.opacity(0.4), radius: 12, y: 8)
             }
         }
+        .buttonStyle(ScaleButtonStyle())
     }
 }
-

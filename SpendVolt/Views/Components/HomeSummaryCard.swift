@@ -88,7 +88,7 @@ struct HomeSummaryCard: View {
                 .frame(height: 8)
                 
                 HStack {
-                    Text("Budget: \(Theme.formatCurrency(budget, decimalPlaces: 0))")
+                    Text("Budget: \(Theme.formatCurrency(budget))")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                     Spacer()
@@ -108,8 +108,8 @@ struct HomeSummaryCard: View {
                     .foregroundColor(insight.isOverPace ? .white : .white.opacity(0.9))
                 
                 Text(insight.isOverPace ? 
-                     "Spending \(Theme.formatCurrency(insight.paceDifference, decimalPlaces: 0)) above daily pace" : 
-                     "Safe to spend \(Theme.formatCurrency(insight.allowance, decimalPlaces: 0)) today")
+                     "Spending \(Theme.formatCurrency(insight.paceDifference)) above daily pace" : 
+                     "Safe to spend \(Theme.formatCurrency(insight.allowance)) today")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white)
                 

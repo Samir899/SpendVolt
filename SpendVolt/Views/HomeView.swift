@@ -11,14 +11,12 @@ struct HomeView: View {
     @State private var isProcessingPayment = false
     @State private var isShowingProfile = false
     @State private var isShowingManualEntry = false
+    @State private var transactionToDelete: String?
+    @State private var isShowingDeleteConfirmation = false
     
     struct PaymentIntent: Identifiable {
         let id = UUID()
         let code: String
-    }
-    
-    var pendingTransactions: [Transaction] {
-        viewModel.transactions.filter { $0.status == .pending }
     }
 
     var body: some View {
@@ -57,9 +55,9 @@ struct HomeView: View {
                         }
                         
                         // MARK: - Pending Actions
-                        if !pendingTransactions.isEmpty {
+                        if !viewModel.pendingTransactions.isEmpty {
                             PendingConfirmationsList(
-                                transactions: pendingTransactions,
+                                transactions: viewModel.pendingTransactions,
                                 categories: viewModel.categories,
                                 onUpdateCategory: { id, category in
                                     viewModel.updateTransactionCategory(id: id, newCategoryName: category)
@@ -68,7 +66,8 @@ struct HomeView: View {
                                     startReconfirmation(for: txn)
                                 },
                                 onDelete: { id in
-                                    viewModel.deleteTransaction(id)
+                                    self.transactionToDelete = id
+                                    self.isShowingDeleteConfirmation = true
                                 }
                             )
                         }
@@ -77,32 +76,27 @@ struct HomeView: View {
                     }
                     .padding(.bottom, 20)
                 }
-                .blur(radius: isProcessingPayment ? 10 : 0)
                 .disabled(isProcessingPayment)
                 
                 // Floating Action Button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button {
-                            isShowingManualEntry = true
-                        } label: {
-                            ZStack {
-                                Circle()
-                                    .fill(Theme.primary)
-                                    .frame(width: 64, height: 64)
-                                    .shadow(color: Theme.primary.opacity(0.4), radius: 10, x: 0, y: 5)
-                                
-                                Image(systemName: "plus")
-                                    .font(.system(size: 28, weight: .bold))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        .padding(.trailing, 24)
-                        .padding(.bottom, 24)
+                Button {
+                    isShowingManualEntry = true
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Theme.primary)
+                            .frame(width: 64, height: 64)
+                            .shadow(color: Theme.primary.opacity(0.4), radius: 10, x: 0, y: 5)
+                        
+                        Image(systemName: "plus")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundColor(.white)
                     }
                 }
+                .buttonStyle(ScaleButtonStyle())
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .padding(.trailing, 24)
+                .padding(.bottom, 24)
                 
                 if isProcessingPayment, let txn = processingTransaction {
                     ProcessingOverlay(
@@ -149,7 +143,7 @@ struct HomeView: View {
                 
                 let finalName = viewModel.getBestPayeeName(from: intent.code)
                 
-                viewModel.initiatePayment(
+                let tempId = viewModel.initiatePayment(
                     merchantName: finalName,
                     amount: paymentAmount,
                     categoryName: selectedCategoryName,
@@ -157,7 +151,7 @@ struct HomeView: View {
                     app: appName
                 )
                 
-                if let newTxn = viewModel.transactions.first {
+                if let newTxn = viewModel.transactions.first(where: { $0.id == tempId }) {
                     self.processingTransaction = newTxn
                     withAnimation(.spring()) { self.isProcessingPayment = true }
                 }
@@ -170,6 +164,16 @@ struct HomeView: View {
         }
         .sheet(isPresented: $isShowingManualEntry) {
             ManualExpenseSheet(viewModel: viewModel)
+        }
+        .alert("Delete Transaction", isPresented: $isShowingDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                if let id = transactionToDelete {
+                    viewModel.deleteTransaction(id)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to delete this transaction? This action cannot be undone.")
         }
     }
     

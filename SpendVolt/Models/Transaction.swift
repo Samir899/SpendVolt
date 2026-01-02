@@ -1,15 +1,25 @@
 import Foundation
 
 struct Transaction: Identifiable, Codable, Equatable {
-    var id = UUID()
+    var id: String
     let merchantName: String
-    let amount: String
+    let amount: Double
     let date: Date
-    var status: TransactionStatus
-    var categoryName: String = "Other"
+    var status: AppConstants.TransactionStatus
+    var categoryName: String = AppConstants.Category.other
     
-    enum TransactionStatus: String, Codable, Equatable {
-        case pending, success, failure
+    init(id: String = UUID().uuidString, 
+         merchantName: String, 
+         amount: Double, 
+         date: Date, 
+         status: AppConstants.TransactionStatus, 
+         categoryName: String = AppConstants.Category.other) {
+        self.id = id
+        self.merchantName = merchantName
+        self.amount = amount
+        self.date = date
+        self.status = status
+        self.categoryName = categoryName
     }
 }
 

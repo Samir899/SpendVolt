@@ -30,7 +30,7 @@ struct ProcessingOverlay: View {
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
                         
-                        Text("Did you finish paying \(Theme.formatCurrency(Double(transaction.amount) ?? 0)) at \(transaction.merchantName)?")
+                        Text("Did you finish paying \(Theme.formatCurrency(transaction.amount)) at \(transaction.merchantName)?")
                             .font(.system(size: 16))
                             .multilineTextAlignment(.center)
                             .foregroundColor(Theme.textSecondary)
@@ -48,6 +48,7 @@ struct ProcessingOverlay: View {
                             .cornerRadius(Theme.cornerRadius)
                             .shadow(color: Theme.primary.opacity(0.3), radius: 8, y: 4)
                     }
+                    .buttonStyle(ScaleButtonStyle())
                     
                     Button(action: onFail) {
                         Text("No, Payment Failed")
@@ -58,12 +59,14 @@ struct ProcessingOverlay: View {
                             .background(Color.red.opacity(0.08))
                             .cornerRadius(Theme.cornerRadius)
                     }
+                    .buttonStyle(ScaleButtonStyle())
                     
                     Button(action: onWait) {
                         Text("I'll verify later")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(Theme.textTertiary)
                     }
+                    .buttonStyle(ScaleButtonStyle())
                     .padding(.top, 8)
                 }
             }

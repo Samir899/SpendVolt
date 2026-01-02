@@ -19,9 +19,9 @@ protocol ProfileStorage {
 protocol StorageServiceProtocol: TransactionStorage, CategoryStorage, ProfileStorage {}
 
 class StorageService: StorageServiceProtocol {
-    private let transactionsKey = "saved_transactions"
-    private let categoriesKey = "user_categories"
-    private let profileKey = "user_profile"
+    private let transactionsKey = AppConstants.Storage.transactions
+    private let categoriesKey = AppConstants.Storage.categories
+    private let profileKey = AppConstants.Storage.profile
     
     // ... existing saveTransactions/loadTransactions ...
     

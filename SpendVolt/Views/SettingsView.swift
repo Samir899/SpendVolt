@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var categoryToDelete: UserCategory?
     @State private var showingDeleteAlert = false
     @State private var showingMovePaymentsSheet = false
+    @State private var showingLogoutAlert = false
     
     let iconOptions = [
         "tag.fill", "fuelpump.fill", "cart.fill", "bag.fill", "creditcard.fill",
@@ -91,11 +92,32 @@ struct SettingsView: View {
                             Text("Privacy Policy")
                         }
                     }
+                    
+                    Section {
+                        Button(role: .destructive) {
+                            showingLogoutAlert = true
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Text("Log Out")
+                                    .fontWeight(.bold)
+                                Spacer()
+                            }
+                        }
+                    }
                 }
             }
             .navigationTitle("Settings")
             .sheet(isPresented: $showingAddCategory) {
                 addCategorySheet
+            }
+            .alert("Log Out", isPresented: $showingLogoutAlert) {
+                Button("Log Out", role: .destructive) {
+                    viewModel.logout()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Are you sure you want to log out? Your data is safe on the server.")
             }
             .alert("Delete Category", isPresented: $showingDeleteAlert, presenting: categoryToDelete) { category in
                 let count = viewModel.countTransactions(for: category.name)
