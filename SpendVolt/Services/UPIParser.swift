@@ -1,28 +1,49 @@
 import Foundation
 
+enum QRType {
+    case merchant
+    case personal
+    case invalid
+}
+
 protocol UPIParserProtocol {
     func parseUPI(url: String, key: String) -> String?
     func getBestPayeeName(from url: String) -> String
-    func isMerchantUPI(url: String) -> Bool
+    func validateQR(url: String) -> QRType
 }
 
 class UPIParser: UPIParserProtocol {
-    func isMerchantUPI(url: String) -> Bool {
+    func validateQR(url: String) -> QRType {
         let cleaned = url.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         
         // 1. Must be a UPI pay URL
         guard cleaned.hasPrefix("upi://pay") else {
-            return false
+            return .invalid
         }
         
         // 2. Must have a payment address (pa)
         let hasPA = cleaned.range(of: "[?&]pa=", options: .regularExpression) != nil
+        if !hasPA { return .invalid }
         
-        // 3. Merchant QRs typically have a Merchant Category Code (mc)
-        // or a Transaction Reference (tr) / Transaction ID (tid) that are merchant-specific
-        let hasMC = cleaned.range(of: "[?&]mc=", options: .regularExpression) != nil
+        // 3. Merchant detection
+        // Merchant QRs must have a Merchant Category Code (mc) that is NOT 0000 (unclassified/personal)
+        // They also typically have a Transaction Reference (tr) or Transaction ID (tid)
+        let mcRange = cleaned.range(of: "[?&]mc=([^&]+)", options: .regularExpression)
+        var mcValue: String?
+        if let range = mcRange {
+            let match = cleaned[range]
+            mcValue = match.components(separatedBy: "=").last
+        }
         
-        return hasPA && hasMC
+        let hasValidMC = mcValue != nil && mcValue != "0000"
+        let hasMerchantParams = cleaned.range(of: "[?&](orgid|sign)=", options: .regularExpression) != nil
+        
+        // If it has a valid merchant code OR signed merchant parameters, it's a merchant
+        if hasValidMC || hasMerchantParams {
+            return .merchant
+        }
+        
+        return .personal
     }
 
     func parseUPI(url: String, key: String) -> String? {

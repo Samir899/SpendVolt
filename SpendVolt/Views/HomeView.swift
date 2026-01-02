@@ -13,6 +13,7 @@ struct HomeView: View {
     @State private var isShowingManualEntry = false
     @State private var transactionToDelete: String?
     @State private var isShowingDeleteConfirmation = false
+    @State private var isShowingPersonalQRAlert = false
     
     struct PaymentIntent: Identifiable {
         let id = UUID()
@@ -125,6 +126,13 @@ struct HomeView: View {
                 completion: { result in
                     self.isShowingScanner = false
                     
+                    if viewModel.validateQR(url: result) == .personal {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            self.isShowingPersonalQRAlert = true
+                        }
+                        return
+                    }
+                    
                     if let qrAmount = viewModel.parseUPI(url: result, key: "am") {
                         self.paymentAmount = qrAmount
                     } else {
@@ -137,7 +145,7 @@ struct HomeView: View {
                     }
                 },
                 validation: { result in
-                    viewModel.isMerchantUPI(url: result)
+                    viewModel.validateQR(url: result)
                 }
             )
         }
@@ -183,6 +191,14 @@ struct HomeView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Are you sure you want to delete this transaction? This action cannot be undone.")
+        }
+        .alert("Personal QR Detected", isPresented: $isShowingPersonalQRAlert) {
+            Button("Log Manually") {
+                isShowingManualEntry = true
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This is a personal QR code. Please pay via your preferred UPI app, then return here to log the expense manually.")
         }
     }
     

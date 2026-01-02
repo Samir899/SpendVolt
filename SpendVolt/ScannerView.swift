@@ -3,7 +3,7 @@ import AVFoundation
 
 struct ScannerView: UIViewControllerRepresentable {
     var completion: (String) -> Void
-    var validation: ((String) -> Bool)? = nil
+    var validation: ((String) -> QRType)
 
     func makeUIViewController(context: Context) -> ScannerViewController {
         let controller = ScannerViewController()
@@ -18,7 +18,7 @@ struct ScannerView: UIViewControllerRepresentable {
         var captureSession: AVCaptureSession!
         var previewLayer: AVCaptureVideoPreviewLayer!
         var completion: ((String) -> Void)?
-        var validation: ((String) -> Bool)?
+        var validation: ((String) -> QRType)?
         
         private var isProcessing = false
         private var errorLabel: UILabel?
@@ -193,18 +193,31 @@ struct ScannerView: UIViewControllerRepresentable {
                 
                 isProcessing = true
                 
-                if let validation = self.validation, !validation(stringValue) {
+                let result = self.validation?(stringValue) ?? .invalid
+                
+                switch result {
+                case .merchant:
+                    // Vibrate and return result
+                    AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))
+                    
+                    DispatchQueue.main.async {
+                        self.captureSession.stopRunning()
+                        self.completion?(stringValue)
+                        self.dismiss(animated: true)
+                    }
+                    
+                case .personal:
+                    // Vibrate and return result (we'll show alert in HomeView)
+                    AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))
+                    
+                    DispatchQueue.main.async {
+                        self.captureSession.stopRunning()
+                        self.completion?(stringValue) // We still return the string so HomeView knows it was a personal QR
+                        self.dismiss(animated: true)
+                    }
+                    
+                case .invalid:
                     showScanError(message: "Invalid Merchant QR Code")
-                    return
-                }
-                
-                // Vibrate and return result
-                AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))
-                
-                DispatchQueue.main.async {
-                    self.captureSession.stopRunning()
-                    self.completion?(stringValue)
-                    self.dismiss(animated: true)
                 }
             }
         }

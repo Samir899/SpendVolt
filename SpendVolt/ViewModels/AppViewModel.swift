@@ -410,8 +410,8 @@ class AppViewModel: ObservableObject {
         upiParser.parseUPI(url: url, key: key)
     }
 
-    func isMerchantUPI(url: String) -> Bool {
-        upiParser.isMerchantUPI(url: url)
+    func validateQR(url: String) -> QRType {
+        upiParser.validateQR(url: url)
     }
 
     func getBestPayeeName(from url: String) -> String {
