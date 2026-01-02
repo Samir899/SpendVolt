@@ -11,6 +11,7 @@ struct ProfileView: View {
     @State private var defaultPaymentApp: String = "Google Pay"
     @State private var warningThreshold: Double = 0.8
     @State private var resetDay: Int = 1
+    @State private var isShowingSubscriptions = false
     
     let paymentApps = ["Google Pay", "PhonePe", "Paytm"]
     
@@ -81,6 +82,24 @@ struct ProfileView: View {
                         }
                     }
                 }
+                
+                Section("Manage") {
+                    Button {
+                        isShowingSubscriptions = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.2.squarepath")
+                                .foregroundColor(Theme.primary)
+                                .frame(width: 24)
+                            Text("Subscriptions & EMIs")
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
+                                .foregroundColor(Theme.textTertiary)
+                        }
+                    }
+                }
             }
             .navigationTitle("User Profile")
             .navigationBarTitleDisplayMode(.inline)
@@ -98,6 +117,9 @@ struct ProfileView: View {
             }
             .onAppear {
                 loadProfileData()
+            }
+            .sheet(isPresented: $isShowingSubscriptions) {
+                SubscriptionsView(viewModel: viewModel)
             }
         }
     }

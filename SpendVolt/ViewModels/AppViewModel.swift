@@ -8,6 +8,7 @@ class AppViewModel: ObservableObject {
     @Published var topThreeSpends: [Transaction] = []
     @Published var dailyInsight: DailyInsight = DailyInsight(allowance: 0, isOverPace: false, paceDifference: 0)
     @Published var categories: [UserCategory] = []
+    @Published var recurringTransactions: [RecurringTransaction] = []
     
     @Published var profile: UserProfile
     @Published var isLoading = false
@@ -96,13 +97,68 @@ class AppViewModel: ObservableObject {
                 self?.applyDashboard(dashboard)
             }
             .store(in: &cancellables)
+            
+        fetchRecurringTransactions()
+    }
+
+    func fetchRecurringTransactions() {
+        networkService.fetchRecurringTransactions()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] completion in
+                if case .failure(let error) = completion {
+                    print("Failed to fetch recurring: \(error)")
+                }
+            } receiveValue: { [weak self] recurring in
+                self?.recurringTransactions = recurring
+            }
+            .store(in: &cancellables)
+    }
+
+    func addRecurringTransaction(merchantName: String, amount: String, categoryName: String, frequency: RecurrenceFrequency, startDate: Date) {
+        let doubleAmount = Double(amount) ?? 0.0
+        let newRecurring = RecurringTransaction(
+            merchantName: merchantName,
+            amount: doubleAmount,
+            categoryName: categoryName,
+            frequency: frequency,
+            nextDueDate: startDate
+        )
+        
+        networkService.createRecurringTransaction(newRecurring)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] completion in
+                if case .failure(let error) = completion {
+                    self?.errorMessage = error.localizedDescription
+                }
+            } receiveValue: { [weak self] saved in
+                self?.recurringTransactions.append(saved)
+            }
+            .store(in: &cancellables)
+    }
+
+    func deleteRecurringTransaction(id: String) {
+        networkService.deleteRecurringTransaction(id: id)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] completion in
+                if case .failure(let error) = completion {
+                    self?.errorMessage = error.localizedDescription
+                }
+            } receiveValue: { [weak self] _ in
+                self?.recurringTransactions.removeAll(where: { $0.id == id })
+            }
+            .store(in: &cancellables)
     }
 
     func applyDashboard(_ dashboard: AppDashboard) {
         self.objectWillChange.send()
         
         if self.transactions != dashboard.transactions { self.transactions = dashboard.transactions }
-        if self.categories != dashboard.categories { self.categories = dashboard.categories }
+        
+        // Merge or replace categories carefully
+        if self.categories != dashboard.categories {
+            self.categories = dashboard.categories
+        }
+        
         self.profile = dashboard.profile
         
         self.totalSpentThisMonth = dashboard.stats.totalSpentThisMonth
@@ -228,14 +284,30 @@ class AppViewModel: ObservableObject {
     }
     
     func addCategory(name: String, icon: String) {
-        let newCat = UserCategory(name: name, icon: icon)
-        categories.append(newCat)
-        saveCategories()
+        let newCat = UserCategory(name: name, icon: icon, type: "EXPENSE")
+        
+        networkService.createCategory(newCat)
+            .receive(on: DispatchQueue.main)
+            .sink(receiveCompletion: { [weak self] completion in
+                if case .failure(let error) = completion {
+                    self?.errorMessage = error.localizedDescription
+                }
+            }, receiveValue: { [weak self] savedCat in
+                self?.categories.append(savedCat)
+                self?.saveCategories()
+            })
+            .store(in: &cancellables)
     }
     
     func deleteCategory(at offsets: IndexSet) {
         for index in offsets {
             let category = categories[index]
+            if let id = category.id {
+                networkService.deleteCategory(id: id)
+                    .receive(on: DispatchQueue.main)
+                    .sink(receiveCompletion: { _ in }, receiveValue: { _ in })
+                    .store(in: &cancellables)
+            }
             moveTransactions(from: category.name, to: AppConstants.Category.unassigned)
         }
         categories.remove(atOffsets: offsets)
@@ -245,6 +317,11 @@ class AppViewModel: ObservableObject {
     func deleteCategory(id: Int?, replacementCategoryName: String? = nil) {
         guard let id = id else { return }
         if let category = categories.first(where: { $0.id == id }) {
+            networkService.deleteCategory(id: id)
+                .receive(on: DispatchQueue.main)
+                .sink(receiveCompletion: { _ in }, receiveValue: { _ in })
+                .store(in: &cancellables)
+                
             let targetName = replacementCategoryName ?? AppConstants.Category.unassigned
             moveTransactions(from: category.name, to: targetName)
             categories.removeAll(where: { $0.id == id })

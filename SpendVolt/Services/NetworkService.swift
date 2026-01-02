@@ -35,8 +35,15 @@ protocol NetworkServiceProtocol {
     func fetchProfile() -> AnyPublisher<UserProfile, Error>
     func updateProfile(_ profile: UserProfile) -> AnyPublisher<UserProfile, Error>
     func fetchCategories() -> AnyPublisher<[UserCategory], Error>
+    func createCategory(_ category: UserCategory) -> AnyPublisher<UserCategory, Error>
+    func deleteCategory(id: Int) -> AnyPublisher<Void, Error>
     func fetchStats() -> AnyPublisher<BackendStats, Error>
     func fetchDashboard() -> AnyPublisher<AppDashboard, Error>
+    
+    // Recurring Transactions
+    func fetchRecurringTransactions() -> AnyPublisher<[RecurringTransaction], Error>
+    func createRecurringTransaction(_ transaction: RecurringTransaction) -> AnyPublisher<RecurringTransaction, Error>
+    func deleteRecurringTransaction(id: String) -> AnyPublisher<Void, Error>
 }
 
 class NetworkService: NetworkServiceProtocol {
@@ -170,12 +177,95 @@ class NetworkService: NetworkServiceProtocol {
         return request("/categories")
     }
 
+    func createCategory(_ category: UserCategory) -> AnyPublisher<UserCategory, Error> {
+        guard let data = try? AppCoder.jsonEncoder.encode(category) else {
+            return Fail(error: NetworkError.decodingError).eraseToAnyPublisher()
+        }
+        return request("/categories", method: "POST", body: data)
+    }
+
+    func deleteCategory(id: Int) -> AnyPublisher<Void, Error> {
+        guard let url = URL(string: "\(baseURL)/categories/\(id)") else {
+            return Fail(error: NetworkError.invalidURL).eraseToAnyPublisher()
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        
+        if let token = authToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { data, response in
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw NetworkError.serverError("We're having trouble connecting to our servers.")
+                }
+                
+                if httpResponse.statusCode == 401 {
+                    throw NetworkError.unauthorized
+                }
+                
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    let message = self.extractMessage(from: data, defaultMessage: "The server encountered an issue.")
+                    throw NetworkError.serverError(message)
+                }
+                
+                return ()
+            }
+            .eraseToAnyPublisher()
+    }
+
     func fetchStats() -> AnyPublisher<BackendStats, Error> {
         return request("/stats")
     }
 
     func fetchDashboard() -> AnyPublisher<AppDashboard, Error> {
         return request("/dashboard")
+    }
+
+    // MARK: - Recurring Transactions
+    func fetchRecurringTransactions() -> AnyPublisher<[RecurringTransaction], Error> {
+        return request("/recurring")
+    }
+
+    func createRecurringTransaction(_ transaction: RecurringTransaction) -> AnyPublisher<RecurringTransaction, Error> {
+        guard let data = try? AppCoder.jsonEncoder.encode(transaction) else {
+            return Fail(error: NetworkError.decodingError).eraseToAnyPublisher()
+        }
+        return request("/recurring", method: "POST", body: data)
+    }
+
+    func deleteRecurringTransaction(id: String) -> AnyPublisher<Void, Error> {
+        guard let url = URL(string: "\(baseURL)/recurring/\(id)") else {
+            return Fail(error: NetworkError.invalidURL).eraseToAnyPublisher()
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        
+        if let token = authToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { data, response in
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw NetworkError.serverError("We're having trouble connecting to our servers.")
+                }
+                
+                if httpResponse.statusCode == 401 {
+                    throw NetworkError.unauthorized
+                }
+                
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    let message = self.extractMessage(from: data, defaultMessage: "The server encountered an issue.")
+                    throw NetworkError.serverError(message)
+                }
+                
+                return ()
+            }
+            .eraseToAnyPublisher()
     }
 }
 

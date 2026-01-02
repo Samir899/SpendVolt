@@ -8,6 +8,8 @@ struct ManualExpenseSheet: View {
     @State private var amount: String = ""
     @State private var selectedCategoryName: String = "Other"
     @State private var date: Date = Date()
+    @State private var isRecurring: Bool = false
+    @State private var selectedFrequency: RecurrenceFrequency = .monthly
     
     var body: some View {
         NavigationStack {
@@ -42,6 +44,42 @@ struct ManualExpenseSheet: View {
                         .padding(.horizontal, Theme.horizontalPadding)
                         .padding(.top, 20)
                         
+                        // Recurring Selection
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Label("Make Recurring", systemImage: "arrow.2.squarepath")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                                Toggle("", isOn: $isRecurring)
+                                    .tint(Theme.primary)
+                                    .labelsHidden()
+                            }
+                            .padding(.horizontal, Theme.horizontalPadding)
+                            
+                            if isRecurring {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 12) {
+                                        ForEach(RecurrenceFrequency.allCases) { freq in
+                                            Button {
+                                                selectedFrequency = freq
+                                            } label: {
+                                                Text(freq.displayName)
+                                                    .font(.system(size: 13, weight: .bold))
+                                                    .padding(.horizontal, 16)
+                                                    .padding(.vertical, 10)
+                                                    .background(selectedFrequency == freq ? Theme.primary : Theme.secondaryBackground)
+                                                    .foregroundColor(selectedFrequency == freq ? .white : Theme.textPrimary)
+                                                    .cornerRadius(12)
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal, Theme.horizontalPadding)
+                                }
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                            }
+                        }
+                        
                         // Details Card
                         VStack(spacing: 24) {
                             // Merchant/Title Input
@@ -59,16 +97,25 @@ struct ManualExpenseSheet: View {
                             
                             // Date Picker Card
                             VStack(alignment: .leading, spacing: 10) {
-                                Text("Transaction Date")
+                                Text(isRecurring ? "Start Date" : "Transaction Date")
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundColor(Theme.textSecondary)
                                 
-                                DatePicker("", selection: $date, in: ...Date(), displayedComponents: .date)
-                                    .datePickerStyle(.graphical)
-                                    .tint(Theme.primary)
-                                    .padding(12)
-                                    .background(Theme.secondaryBackground)
-                                    .cornerRadius(16)
+                                if isRecurring {
+                                    DatePicker("", selection: $date, in: Calendar.current.startOfDay(for: Date())..., displayedComponents: .date)
+                                        .datePickerStyle(.graphical)
+                                        .tint(Theme.primary)
+                                        .padding(12)
+                                        .background(Theme.secondaryBackground)
+                                        .cornerRadius(16)
+                                } else {
+                                    DatePicker("", selection: $date, in: ...Date(), displayedComponents: .date)
+                                        .datePickerStyle(.graphical)
+                                        .tint(Theme.primary)
+                                        .padding(12)
+                                        .background(Theme.secondaryBackground)
+                                        .cornerRadius(16)
+                                }
                             }
                         }
                         .padding(.horizontal, Theme.horizontalPadding)
@@ -124,14 +171,37 @@ struct ManualExpenseSheet: View {
                 }
             }
         }
+        .onChange(of: isRecurring) { newValue in
+            if newValue {
+                // If switching to recurring, ensure date is not in the past
+                if date < Calendar.current.startOfDay(for: Date()) {
+                    date = Date()
+                }
+            } else {
+                // If switching to manual, ensure date is not in the future
+                if date > Date() {
+                    date = Date()
+                }
+            }
+        }
     }
     
     private func saveExpense() {
-        viewModel.addManualTransaction(
-            merchantName: merchantName,
-            amount: amount,
-            categoryName: selectedCategoryName,
-            date: date
-        )
+        if isRecurring {
+            viewModel.addRecurringTransaction(
+                merchantName: merchantName,
+                amount: amount,
+                categoryName: selectedCategoryName,
+                frequency: selectedFrequency,
+                startDate: date
+            )
+        } else {
+            viewModel.addManualTransaction(
+                merchantName: merchantName,
+                amount: amount,
+                categoryName: selectedCategoryName,
+                date: date
+            )
+        }
     }
 }
