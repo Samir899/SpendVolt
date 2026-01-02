@@ -43,6 +43,7 @@ struct RegistrationResponse: Codable {
 protocol AuthServiceProtocol {
     func signup(firstName: String, lastName: String, email: String) -> AnyPublisher<RegistrationResponse, Error>
     func login(username: String, password: String) -> AnyPublisher<AuthResponse, Error>
+    func forgotPassword(email: String) -> AnyPublisher<String, Error>
 }
 
 class AuthService: AuthServiceProtocol {
@@ -164,6 +165,45 @@ class AuthService: AuthServiceProtocol {
                     print("Critical Decoding Error: \(decodingError)")
                     return AuthError.decodingError
                 }
+                return AuthError.unknown(error.localizedDescription)
+            }
+            .eraseToAnyPublisher()
+    }
+    
+    func forgotPassword(email: String) -> AnyPublisher<String, Error> {
+        guard let url = URL(string: "\(baseURL)/public/auth/forgot-password") else {
+            return Fail(error: AuthError.invalidURL).eraseToAnyPublisher()
+        }
+        
+        let body: [String: String] = ["email": email]
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { data, response in
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw AuthError.serverError("Invalid response from server")
+                }
+                
+                if (200...299).contains(httpResponse.statusCode) {
+                    // Try to parse as JSON first (as the backend now wraps the string)
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let message = json["message"] as? String {
+                        return message
+                    }
+                    // Fallback to raw string if not JSON
+                    return String(data: data, encoding: .utf8) ?? "Success"
+                } else {
+                    let message = self.extractMessage(from: data, defaultMessage: "Could not process request.")
+                    throw AuthError.serverError(message)
+                }
+            }
+            .mapError { error -> Error in
+                if let authError = error as? AuthError { return authError }
                 return AuthError.unknown(error.localizedDescription)
             }
             .eraseToAnyPublisher()

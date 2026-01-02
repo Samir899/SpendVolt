@@ -9,6 +9,7 @@ struct LoginView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showingSignup = false
+    @State private var showingForgotPassword = false
     @State private var cancellables = Set<AnyCancellable>()
     
     // Focused management
@@ -84,6 +85,7 @@ struct LoginView: View {
                         Spacer()
                         Button("Forgot Password?") {
                             focusedField = nil // Dismiss keyboard
+                            showingForgotPassword = true
                         }
                         .font(.footnote.bold())
                         .foregroundColor(Theme.primary)
@@ -148,6 +150,9 @@ struct LoginView: View {
             SignupView(onSignupSuccess: {
                 self.showingSignup = false
             })
+        }
+        .sheet(isPresented: $showingForgotPassword) {
+            ForgotPasswordView()
         }
     }
     
