@@ -1,15 +1,16 @@
 import Foundation
 
 struct APIConfig {
-    // Simply change this IP once when your network changes
-    static let serverIP = "192.168.1.6"
+    // GCP External IPs
+    static let backendIP = "34.180.26.38"
+    static let oauthIP = "35.244.47.31"
     
     static var spendVoltBaseURL: String {
-        return "http://\(serverIP):8081/api"
+        return "http://\(backendIP):8081/api"
     }
     
     static var oauthBaseURL: String {
-        return "http://\(serverIP):9000/api"
+        return "http://\(oauthIP):9000/api"
     }
 }
 
