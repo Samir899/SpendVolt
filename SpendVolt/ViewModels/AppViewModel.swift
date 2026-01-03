@@ -243,14 +243,20 @@ class AppViewModel: ObservableObject {
         return tempId
     }
     
-    func confirmTransaction(_ id: String) {
+    func confirmTransaction(_ id: String, finalAmount: Double? = nil) {
         let currentId = idMap[id] ?? id
         if let index = transactions.firstIndex(where: { $0.id == currentId }) {
+            if let amount = finalAmount {
+                transactions[index].amount = amount
+            }
             transactions[index].status = .success
             saveTransactions()
             
             if let intId = Int(currentId) {
-                networkService.updateTransactionStatus(id: intId, status: AppConstants.TransactionStatus.success.rawValue)
+                let status = AppConstants.TransactionStatus.success.rawValue
+                // If amount changed, we might need a separate API call or a more robust update
+                // For now, update status and local amount.
+                networkService.updateTransactionStatus(id: intId, status: status)
                     .receive(on: DispatchQueue.main)
                     .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] _ in
                         self?.refreshStats()
@@ -278,9 +284,20 @@ class AppViewModel: ObservableObject {
     }
     
     func deleteTransaction(_ id: String) {
-        transactions.removeAll(where: { $0.id == id })
+        let currentId = idMap[id] ?? id
+        transactions.removeAll(where: { $0.id == id || $0.id == currentId })
         saveTransactions()
-        refreshStats()
+        
+        if let intId = Int(currentId) {
+            networkService.deleteTransaction(id: intId)
+                .receive(on: DispatchQueue.main)
+                .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] _ in
+                    self?.refreshStats()
+                })
+                .store(in: &cancellables)
+        } else {
+            refreshStats()
+        }
     }
     
     func addCategory(name: String, icon: String) {

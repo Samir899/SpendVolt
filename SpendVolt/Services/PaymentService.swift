@@ -14,28 +14,37 @@ class UPIPaymentService: PaymentServiceProtocol {
     ]
 
     func openDirectApp(url: String, amount: String, app: String) {
-        guard var components = URLComponents(string: url) else { return }
-        var queryItems = components.queryItems ?? []
+        // 1. Extract VPA (UPI ID)
+        let cleanedURL = url.removingPercentEncoding ?? url
         
-        queryItems.removeAll(where: { $0.name == "am" })
-        
-        if let amountDouble = Double(amount) {
-            let formattedAmount = String(format: "%.2f", amountDouble)
-            queryItems.append(URLQueryItem(name: "am", value: formattedAmount))
+        func extractVPA() -> String {
+            // Try query param 'pa='
+            if let range = cleanedURL.range(of: "(?i)pa=[^&;?]+", options: .regularExpression) {
+                return cleanedURL[range].replacingOccurrences(of: "pa=", with: "", options: .caseInsensitive)
+            }
+            // Try path-based VPA: upi://pay/vpa@bank
+            if let range = cleanedURL.range(of: "(?<=upi://pay/)[^?&;?]+", options: .regularExpression) {
+                let vpa = String(cleanedURL[range])
+                if vpa.contains("@") { return vpa }
+            }
+            // Fallback: search for anything with @
+            let parts = cleanedURL.components(separatedBy: CharacterSet(charactersIn: "?&;=/"))
+            return parts.first(where: { $0.contains("@") }) ?? ""
         }
+
+        let pa = extractVPA()
+        guard !pa.isEmpty else { return }
+
+        // 2. Launch the selected app cleanly (no deep link intent to avoid blocks)
+        let baseSchemes: [String: String] = [
+            "Google Pay": "tez://",
+            "PhonePe": "phonepe://",
+            "Paytm": "paytmmp://"
+        ]
         
-        components.queryItems = queryItems
-        components.scheme = "upi"
-        components.host = "pay"
-        
-        guard let upiString = components.string else { return }
-        
-        let finalURLString = handlers
-            .first(where: { $0.appName == app })?
-            .transform(upiString: upiString) ?? upiString
-        
-        if let finalURL = URL(string: finalURLString) {
-            UIApplication.shared.open(finalURL)
+        let scheme = baseSchemes[app] ?? "upi://"
+        if let url = URL(string: scheme) {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
         }
     }
 }

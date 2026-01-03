@@ -106,8 +106,8 @@ struct HomeView: View {
                     ProcessingOverlay(
                         transaction: txn,
                         currencySymbol: viewModel.currencySymbol,
-                        onVerify: { 
-                            viewModel.confirmTransaction(txn.id)
+                        onVerify: { finalAmount in
+                            viewModel.confirmTransaction(txn.id, finalAmount: finalAmount)
                             withAnimation(.spring()) { self.isProcessingPayment = false }
                         },
                         onFail: { 
@@ -127,10 +127,7 @@ struct HomeView: View {
                     self.isShowingScanner = false
                     
                     if viewModel.validateQR(url: result) == .personal {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            self.isShowingPersonalQRAlert = true
-                        }
-                        return
+                        // We allow personal QRs to proceed so the user can pay and we can track it.
                     }
                     
                     if let qrAmount = viewModel.parseUPI(url: result, key: "am") {

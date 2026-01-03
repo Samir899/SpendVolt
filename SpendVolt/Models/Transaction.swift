@@ -2,9 +2,9 @@ import Foundation
 
 struct Transaction: Identifiable, Codable, Equatable {
     var id: String
-    let merchantName: String
-    let amount: Double
-    let date: Date
+    var merchantName: String
+    var amount: Double
+    var date: Date
     var status: AppConstants.TransactionStatus
     var categoryName: String = AppConstants.Category.other
     

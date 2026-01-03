@@ -46,25 +46,6 @@ struct PaymentBottomSheet: View {
                 }
                 .padding(.top, 30)
                 
-                // MARK: - Amount Input
-                VStack(spacing: 12) {
-                    HStack {
-                        Text(viewModel.currencySymbol)
-                            .font(.system(size: 40, weight: .bold, design: .rounded))
-                            .foregroundColor(Theme.textPrimary)
-                        
-                        TextField("0", text: $amount)
-                            .keyboardType(.decimalPad)
-                            .font(.system(size: 56, weight: .bold, design: .rounded))
-                            .foregroundColor(Theme.primary)
-                    }
-                    .padding(.vertical, 20)
-                    .frame(maxWidth: .infinity)
-                    .background(Theme.secondaryBackground)
-                    .cornerRadius(20)
-                }
-                .padding(.horizontal, Theme.horizontalPadding)
-
                 // MARK: - Category Selection
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Select Category")

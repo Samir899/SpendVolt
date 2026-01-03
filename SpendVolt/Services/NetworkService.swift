@@ -30,6 +30,7 @@ enum NetworkError: LocalizedError, Equatable {
 protocol NetworkServiceProtocol {
     func fetchTransactions() -> AnyPublisher<[Transaction], Error>
     func createTransaction(_ transaction: Transaction) -> AnyPublisher<Transaction, Error>
+    func deleteTransaction(id: Int) -> AnyPublisher<Void, Error>
     func updateTransactionCategory(id: Int, categoryName: String) -> AnyPublisher<Transaction, Error>
     func updateTransactionStatus(id: Int, status: String) -> AnyPublisher<Transaction, Error>
     func fetchProfile() -> AnyPublisher<UserProfile, Error>
@@ -152,6 +153,38 @@ class NetworkService: NetworkServiceProtocol {
         
         print("Creating transaction: \(String(data: data, encoding: .utf8) ?? "")")
         return request("/transactions", method: "POST", body: data)
+    }
+
+    func deleteTransaction(id: Int) -> AnyPublisher<Void, Error> {
+        guard let url = URL(string: "\(baseURL)/transactions/\(id)") else {
+            return Fail(error: NetworkError.invalidURL).eraseToAnyPublisher()
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        
+        if let token = authToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { data, response in
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw NetworkError.serverError("We're having trouble connecting to our servers.")
+                }
+                
+                if httpResponse.statusCode == 401 {
+                    throw NetworkError.unauthorized
+                }
+                
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    let message = self.extractMessage(from: data, defaultMessage: "The server encountered an issue.")
+                    throw NetworkError.serverError(message)
+                }
+                
+                return ()
+            }
+            .eraseToAnyPublisher()
     }
 
     func updateTransactionCategory(id: Int, categoryName: String) -> AnyPublisher<Transaction, Error> {

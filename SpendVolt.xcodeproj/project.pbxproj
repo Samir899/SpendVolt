@@ -10,9 +10,22 @@
 		64515ED02F037613005EEC21 /* SpendVolt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SpendVolt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		64EDC37C2F08E082009FA4DD /* Exceptions for "SpendVolt" folder in "SpendVolt" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 64515ECF2F037613005EEC21 /* SpendVolt */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		64515ED22F037613005EEC21 /* SpendVolt */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				64EDC37C2F08E082009FA4DD /* Exceptions for "SpendVolt" folder in "SpendVolt" target */,
+			);
 			path = SpendVolt;
 			sourceTree = "<group>";
 		};
@@ -255,6 +268,7 @@
 				DEVELOPMENT_TEAM = 2VWA4N35A6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SpendVolt/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SpendVolt;
 				INFOPLIST_KEY_LSApplicationQueriesSchemes = "https gpay com.google.GooglePay tez phonepe paytmmp upi";
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = YES;
@@ -288,6 +302,7 @@
 				DEVELOPMENT_TEAM = 2VWA4N35A6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SpendVolt/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SpendVolt;
 				INFOPLIST_KEY_LSApplicationQueriesSchemes = "https gpay com.google.GooglePay tez phonepe paytmmp upi";
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = YES;
