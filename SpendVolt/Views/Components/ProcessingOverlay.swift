@@ -26,7 +26,9 @@ struct ProcessingOverlay: View {
     }
     
     var body: some View {
-        ZStack {
+        let isSaveDisabled = amountPaid.isEmpty || (Double(amountPaid) ?? 0) <= 0
+        
+        return ZStack {
             // Dark Blur Background
             Rectangle()
                 .fill(.ultraThinMaterial)
@@ -68,6 +70,12 @@ struct ProcessingOverlay: View {
                     .padding(.horizontal, 24)
                     .background(Theme.secondaryBackground)
                     .cornerRadius(16)
+                    
+                    if !amountPaid.isEmpty && (Double(amountPaid) ?? 0) <= 0 {
+                        Text("Amount must be greater than zero")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.red)
+                    }
                 }
                 .padding(.vertical, 8)
                 
@@ -81,11 +89,12 @@ struct ProcessingOverlay: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
-                            .background(Theme.primary)
+                            .background(isSaveDisabled ? Color.gray.opacity(0.3) : Theme.primary)
                             .cornerRadius(Theme.cornerRadius)
                             .shadow(color: Theme.primary.opacity(0.3), radius: 8, y: 4)
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .disabled(isSaveDisabled)
                     
                     Button(action: onFail) {
                         Text("Payment Failed / Cancelled")

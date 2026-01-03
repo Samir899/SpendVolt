@@ -44,6 +44,13 @@ struct ManualExpenseSheet: View {
                         .padding(.horizontal, Theme.horizontalPadding)
                         .padding(.top, 20)
                         
+                        if !amount.isEmpty && (Double(amount) ?? 0) <= 0 {
+                            Text("Amount must be greater than zero")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.red)
+                                .padding(.top, -20)
+                        }
+                        
                         // Recurring Selection
                         VStack(alignment: .leading, spacing: 16) {
                             HStack {
@@ -152,12 +159,12 @@ struct ManualExpenseSheet: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 60)
-                                .background(merchantName.isEmpty || amount.isEmpty ? Color.gray.opacity(0.3) : Theme.primary)
+                                .background(merchantName.isEmpty || amount.isEmpty || (Double(amount) ?? 0) <= 0 ? Color.gray.opacity(0.3) : Theme.primary)
                                 .cornerRadius(18)
                                 .shadow(color: Theme.primary.opacity(0.3), radius: 10, y: 5)
                         }
                         .buttonStyle(ScaleButtonStyle())
-                        .disabled(merchantName.isEmpty || amount.isEmpty)
+                        .disabled(merchantName.isEmpty || amount.isEmpty || (Double(amount) ?? 0) <= 0)
                         .padding(.horizontal, Theme.horizontalPadding)
                         .padding(.bottom, 40)
                     }

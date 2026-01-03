@@ -28,7 +28,7 @@ enum NetworkError: LocalizedError, Equatable {
 }
 
 protocol NetworkServiceProtocol {
-    func fetchTransactions() -> AnyPublisher<[Transaction], Error>
+    func fetchTransactions(from: Date?, to: Date?) -> AnyPublisher<[Transaction], Error>
     func createTransaction(_ transaction: Transaction) -> AnyPublisher<Transaction, Error>
     func deleteTransaction(id: Int) -> AnyPublisher<Void, Error>
     func updateTransactionCategory(id: Int, categoryName: String) -> AnyPublisher<Transaction, Error>
@@ -39,7 +39,7 @@ protocol NetworkServiceProtocol {
     func createCategory(_ category: UserCategory) -> AnyPublisher<UserCategory, Error>
     func deleteCategory(id: Int) -> AnyPublisher<Void, Error>
     func fetchStats() -> AnyPublisher<BackendStats, Error>
-    func fetchDashboard() -> AnyPublisher<AppDashboard, Error>
+    func fetchDashboard(from: Date?, to: Date?) -> AnyPublisher<AppDashboard, Error>
     
     // Recurring Transactions
     func fetchRecurringTransactions() -> AnyPublisher<[RecurringTransaction], Error>
@@ -142,8 +142,29 @@ class NetworkService: NetworkServiceProtocol {
             .eraseToAnyPublisher()
     }
 
-    func fetchTransactions() -> AnyPublisher<[Transaction], Error> {
-        return request("/transactions")
+    func fetchTransactions(from: Date?, to: Date?) -> AnyPublisher<[Transaction], Error> {
+        var path = "/transactions"
+        var queryItems: [URLQueryItem] = []
+        
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        
+        if let from = from {
+            queryItems.append(URLQueryItem(name: "from", value: formatter.string(from: from)))
+        }
+        if let to = to {
+            queryItems.append(URLQueryItem(name: "to", value: formatter.string(from: to)))
+        }
+        
+        if !queryItems.isEmpty {
+            var components = URLComponents()
+            components.queryItems = queryItems
+            if let query = components.query {
+                path += "?\(query)"
+            }
+        }
+        
+        return request(path)
     }
 
     func createTransaction(_ transaction: Transaction) -> AnyPublisher<Transaction, Error> {
@@ -253,8 +274,29 @@ class NetworkService: NetworkServiceProtocol {
         return request("/stats")
     }
 
-    func fetchDashboard() -> AnyPublisher<AppDashboard, Error> {
-        return request("/dashboard")
+    func fetchDashboard(from: Date?, to: Date?) -> AnyPublisher<AppDashboard, Error> {
+        var path = "/dashboard"
+        var queryItems: [URLQueryItem] = []
+        
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        
+        if let from = from {
+            queryItems.append(URLQueryItem(name: "from", value: formatter.string(from: from)))
+        }
+        if let to = to {
+            queryItems.append(URLQueryItem(name: "to", value: formatter.string(from: to)))
+        }
+        
+        if !queryItems.isEmpty {
+            var components = URLComponents()
+            components.queryItems = queryItems
+            if let query = components.query {
+                path += "?\(query)"
+            }
+        }
+        
+        return request(path)
     }
 
     // MARK: - Recurring Transactions

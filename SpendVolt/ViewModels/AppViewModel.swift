@@ -84,7 +84,20 @@ class AppViewModel: ObservableObject {
     func syncWithBackend() {
         guard isAuthenticated else { return }
         
-        networkService.fetchDashboard()
+        let calendar = Calendar.current
+        let now = Date()
+        
+        // Start of current month
+        let startComponents = calendar.dateComponents([.year, .month], from: now)
+        guard let startDate = calendar.date(from: startComponents) else { return }
+        
+        // End of current month
+        var endComponents = DateComponents()
+        endComponents.month = 1
+        endComponents.second = -1
+        guard let endDate = calendar.date(byAdding: endComponents, to: startDate) else { return }
+        
+        networkService.fetchDashboard(from: startDate, to: endDate)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] completion in
                 if case .failure(let error) = completion {
@@ -116,6 +129,13 @@ class AppViewModel: ObservableObject {
 
     func addRecurringTransaction(merchantName: String, amount: String, categoryName: String, frequency: RecurrenceFrequency, startDate: Date) {
         let doubleAmount = Double(amount) ?? 0.0
+        
+        // Validation: Don't save if amount is 0
+        guard doubleAmount > 0 else {
+            errorMessage = "Please enter an amount greater than zero."
+            return
+        }
+        
         let newRecurring = RecurringTransaction(
             merchantName: merchantName,
             amount: doubleAmount,
@@ -246,16 +266,20 @@ class AppViewModel: ObservableObject {
     func confirmTransaction(_ id: String, finalAmount: Double? = nil) {
         let currentId = idMap[id] ?? id
         if let index = transactions.firstIndex(where: { $0.id == currentId }) {
-            if let amount = finalAmount {
-                transactions[index].amount = amount
+            let amountToSave = finalAmount ?? transactions[index].amount
+            
+            // Validation: Don't save if amount is 0
+            guard amountToSave > 0 else {
+                errorMessage = "Transaction amount must be greater than zero."
+                return
             }
+            
+            transactions[index].amount = amountToSave
             transactions[index].status = .success
             saveTransactions()
             
             if let intId = Int(currentId) {
                 let status = AppConstants.TransactionStatus.success.rawValue
-                // If amount changed, we might need a separate API call or a more robust update
-                // For now, update status and local amount.
                 networkService.updateTransactionStatus(id: intId, status: status)
                     .receive(on: DispatchQueue.main)
                     .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] _ in
@@ -382,6 +406,13 @@ class AppViewModel: ObservableObject {
     func addManualTransaction(merchantName: String, amount: String, categoryName: String, date: Date) {
         let tempId = UUID().uuidString
         let doubleAmount = Double(amount) ?? 0.0
+        
+        // Validation: Don't save if amount is 0
+        guard doubleAmount > 0 else {
+            errorMessage = "Please enter an amount greater than zero."
+            return
+        }
+        
         let newTxn = Transaction(
             id: tempId,
             merchantName: merchantName,
@@ -411,7 +442,17 @@ class AppViewModel: ObservableObject {
     }
 
     private func refreshStats() {
-        networkService.fetchDashboard()
+        let calendar = Calendar.current
+        let now = Date()
+        let startComponents = calendar.dateComponents([.year, .month], from: now)
+        guard let startDate = calendar.date(from: startComponents) else { return }
+        
+        var endComponents = DateComponents()
+        endComponents.month = 1
+        endComponents.second = -1
+        guard let endDate = calendar.date(byAdding: endComponents, to: startDate) else { return }
+
+        networkService.fetchDashboard(from: startDate, to: endDate)
             .receive(on: DispatchQueue.main)
             .sink { completion in
                 if case .failure(let error) = completion {
