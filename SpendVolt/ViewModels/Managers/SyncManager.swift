@@ -69,19 +69,49 @@ class SyncManager {
     func applyDashboard(_ dashboard: AppDashboard) {
         state.objectWillChange.send()
         
-        if state.transactions != dashboard.transactions { state.transactions = dashboard.transactions }
+        // Merge backend transactions with local-only pending ones
+        // Local-only pending ones are those that have a UUID as ID (not an Int) and status .pending
+        let localPending = state.transactions.filter { $0.status == .pending && Int($0.id) == nil }
+        
+        // Also keep local-only success transactions that haven't synced yet (UUID and .success)
+        // But only if they are not already in the dashboard (matched by note/UUID)
+        let localUnsyncedSuccess = state.transactions.filter { localTxn in
+            localTxn.status == .success && 
+            Int(localTxn.id) == nil && 
+            !dashboard.transactions.contains(where: { $0.note == localTxn.id }) 
+        }
+        
+        var mergedTransactions = dashboard.transactions
+        
+        // Add back the local pending ones if they are not already matched in dashboard
+        for pending in localPending {
+            if !mergedTransactions.contains(where: { $0.note == pending.id }) {
+                mergedTransactions.insert(pending, at: 0)
+            }
+        }
+        
+        for success in localUnsyncedSuccess {
+             if !mergedTransactions.contains(where: { $0.note == success.id }) {
+                mergedTransactions.insert(success, at: 0)
+            }
+        }
+        
+        // Sort by date (descending)
+        mergedTransactions.sort { $0.date > $1.date }
+        
+        if state.transactions != mergedTransactions { state.transactions = mergedTransactions }
         if state.categories != dashboard.categories { state.categories = dashboard.categories }
         state.profile = dashboard.profile
         state.totalSpentThisMonth = dashboard.stats.totalSpentThisMonth
         state.topThreeSpends = dashboard.stats.topThreeSpends
         state.dailyInsight = dashboard.stats.dailyInsight
-        state.recurringTransactions = dashboard.recurringTransactions // Added this line
+        state.recurringTransactions = dashboard.recurringTransactions
         state.isAuthenticated = true
         
         storageService.saveTransactions(state.transactions)
         storageService.saveCategories(state.categories)
         storageService.saveProfile(state.profile)
-        storageService.saveRecurringTransactions(state.recurringTransactions) // Added this line
+        storageService.saveRecurringTransactions(state.recurringTransactions)
     }
 
     func fetchRecurringTransactions() {

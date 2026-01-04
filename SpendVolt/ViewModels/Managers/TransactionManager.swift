@@ -6,7 +6,6 @@ class TransactionManager {
     private let networkService: NetworkServiceProtocol
     private let storageService: StorageServiceProtocol
     private let paymentService: PaymentServiceProtocol
-    private var idMap: [String: String] = [:]
     private var cancellables = Set<AnyCancellable>()
     
     var onDashboardReceived: ((AppDashboard) -> Void)?
@@ -38,28 +37,23 @@ class TransactionManager {
                                amount: doubleAmount, 
                                date: Date(), 
                                status: .pending, 
-                               categoryName: categoryName)
+                               categoryName: categoryName,
+                               note: tempId) // Store UUID in note for future sync matching
         
+        // 1. Add to local state
         state.transactions.insert(newTxn, at: 0)
         
-        networkService.createTransaction(newTxn)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] completion in
-                if case .failure = completion {
-                    self?.state.transactions.removeAll(where: { $0.id == tempId })
-                }
-            } receiveValue: { [weak self] dashboard in
-                self?.onDashboardReceived?(dashboard)
-            }
-            .store(in: &cancellables)
-
+        // 2. Persist locally immediately so it survives app restarts
+        storageService.saveTransactions(state.transactions)
+        
+        // 3. Open the payment app
         paymentService.openDirectApp(url: url, amount: amount, app: app)
+        
         return tempId
     }
 
     func confirmTransaction(_ id: String, finalAmount: Double? = nil) {
-        let currentId = idMap[id] ?? id
-        if let index = state.transactions.firstIndex(where: { $0.id == currentId }) {
+        if let index = state.transactions.firstIndex(where: { $0.id == id }) {
             let amountToSave = finalAmount ?? state.transactions[index].amount
             
             guard amountToSave > 0 else {
@@ -67,28 +61,34 @@ class TransactionManager {
                 return
             }
             
+            // 1. Update local state
             state.transactions[index].amount = amountToSave
             state.transactions[index].status = .success
             storageService.saveTransactions(state.transactions)
             
-            if let intId = Int(currentId) {
-                networkService.updateTransactionStatus(id: intId, status: AppConstants.TransactionStatus.success.rawValue)
-                    .receive(on: DispatchQueue.main)
-                    .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] dashboard in
-                        self?.onDashboardReceived?(dashboard)
-                    })
-                    .store(in: &cancellables)
-            }
+            // 2. Send to backend now that it's confirmed
+            let transactionToSync = state.transactions[index]
+            networkService.createTransaction(transactionToSync)
+                .receive(on: DispatchQueue.main)
+                .sink { completion in
+                    if case .failure(let error) = completion {
+                        print("Failed to sync confirmed transaction: \(error)")
+                    }
+                } receiveValue: { [weak self] dashboard in
+                    print("Transaction synced successfully with backend")
+                    self?.onDashboardReceived?(dashboard)
+                }
+                .store(in: &cancellables)
         }
     }
 
     func rejectTransaction(_ id: String) {
-        let currentId = idMap[id] ?? id
-        if let index = state.transactions.firstIndex(where: { $0.id == currentId }) {
+        if let index = state.transactions.firstIndex(where: { $0.id == id }) {
             state.transactions[index].status = .failure
             storageService.saveTransactions(state.transactions)
             
-            if let intId = Int(currentId) {
+            // If it was already on the backend (has an Int ID), update it there too
+            if let intId = Int(id) {
                 networkService.updateTransactionStatus(id: intId, status: AppConstants.TransactionStatus.failure.rawValue)
                     .receive(on: DispatchQueue.main)
                     .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] dashboard in
@@ -100,11 +100,10 @@ class TransactionManager {
     }
 
     func deleteTransaction(_ id: String) {
-        let currentId = idMap[id] ?? id
-        state.transactions.removeAll(where: { $0.id == id || $0.id == currentId })
+        state.transactions.removeAll(where: { $0.id == id })
         storageService.saveTransactions(state.transactions)
         
-        if let intId = Int(currentId) {
+        if let intId = Int(id) {
             networkService.deleteTransaction(id: intId)
                 .receive(on: DispatchQueue.main)
                 .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] dashboard in
@@ -123,14 +122,23 @@ class TransactionManager {
             return
         }
         
-        let newTxn = Transaction(id: tempId, merchantName: merchantName, amount: doubleAmount, date: date, status: .success, categoryName: categoryName)
-        state.transactions.insert(newTxn, at: 0)
+        let newTxn = Transaction(id: tempId, 
+                                merchantName: merchantName, 
+                                amount: doubleAmount, 
+                                date: date, 
+                                status: .success, 
+                                categoryName: categoryName)
         
+        // 1. Update local state
+        state.transactions.insert(newTxn, at: 0)
+        storageService.saveTransactions(state.transactions)
+        
+        // 2. Sync with backend
         networkService.createTransaction(newTxn)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] completion in
-                if case .failure = completion {
-                    self?.state.transactions.removeAll(where: { $0.id == tempId })
+            .sink { completion in
+                if case .failure(let error) = completion {
+                    print("Failed to sync manual transaction: \(error)")
                 }
             } receiveValue: { [weak self] dashboard in
                 self?.onDashboardReceived?(dashboard)
