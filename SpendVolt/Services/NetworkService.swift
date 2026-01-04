@@ -29,22 +29,22 @@ enum NetworkError: LocalizedError, Equatable {
 
 protocol NetworkServiceProtocol {
     func fetchTransactions(from: Date?, to: Date?) -> AnyPublisher<[Transaction], Error>
-    func createTransaction(_ transaction: Transaction) -> AnyPublisher<Transaction, Error>
-    func deleteTransaction(id: Int) -> AnyPublisher<Void, Error>
-    func updateTransactionCategory(id: Int, categoryName: String) -> AnyPublisher<Transaction, Error>
-    func updateTransactionStatus(id: Int, status: String) -> AnyPublisher<Transaction, Error>
+    func createTransaction(_ transaction: Transaction) -> AnyPublisher<AppDashboard, Error>
+    func deleteTransaction(id: Int) -> AnyPublisher<AppDashboard, Error>
+    func updateTransactionCategory(id: Int, categoryName: String) -> AnyPublisher<AppDashboard, Error>
+    func updateTransactionStatus(id: Int, status: String) -> AnyPublisher<AppDashboard, Error>
     func fetchProfile() -> AnyPublisher<UserProfile, Error>
-    func updateProfile(_ profile: UserProfile) -> AnyPublisher<UserProfile, Error>
+    func updateProfile(_ profile: UserProfile) -> AnyPublisher<AppDashboard, Error>
     func fetchCategories() -> AnyPublisher<[UserCategory], Error>
-    func createCategory(_ category: UserCategory) -> AnyPublisher<UserCategory, Error>
-    func deleteCategory(id: Int) -> AnyPublisher<Void, Error>
+    func createCategory(_ category: UserCategory) -> AnyPublisher<AppDashboard, Error>
+    func deleteCategory(id: Int) -> AnyPublisher<AppDashboard, Error>
     func fetchStats() -> AnyPublisher<BackendStats, Error>
     func fetchDashboard(from: Date?, to: Date?) -> AnyPublisher<AppDashboard, Error>
     
     // Recurring Transactions
     func fetchRecurringTransactions() -> AnyPublisher<[RecurringTransaction], Error>
-    func createRecurringTransaction(_ transaction: RecurringTransaction) -> AnyPublisher<RecurringTransaction, Error>
-    func deleteRecurringTransaction(id: String) -> AnyPublisher<Void, Error>
+    func createRecurringTransaction(_ transaction: RecurringTransaction) -> AnyPublisher<AppDashboard, Error>
+    func deleteRecurringTransaction(id: String) -> AnyPublisher<AppDashboard, Error>
 }
 
 class NetworkService: NetworkServiceProtocol {
@@ -167,7 +167,7 @@ class NetworkService: NetworkServiceProtocol {
         return request(path)
     }
 
-    func createTransaction(_ transaction: Transaction) -> AnyPublisher<Transaction, Error> {
+    func createTransaction(_ transaction: Transaction) -> AnyPublisher<AppDashboard, Error> {
         guard let data = try? AppCoder.jsonEncoder.encode(transaction) else {
             return Fail(error: NetworkError.decodingError).eraseToAnyPublisher()
         }
@@ -176,43 +176,15 @@ class NetworkService: NetworkServiceProtocol {
         return request("/transactions", method: "POST", body: data)
     }
 
-    func deleteTransaction(id: Int) -> AnyPublisher<Void, Error> {
-        guard let url = URL(string: "\(baseURL)/transactions/\(id)") else {
-            return Fail(error: NetworkError.invalidURL).eraseToAnyPublisher()
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-        
-        if let token = authToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        return URLSession.shared.dataTaskPublisher(for: request)
-            .tryMap { data, response in
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    throw NetworkError.serverError("We're having trouble connecting to our servers.")
-                }
-                
-                if httpResponse.statusCode == 401 {
-                    throw NetworkError.unauthorized
-                }
-                
-                guard (200...299).contains(httpResponse.statusCode) else {
-                    let message = self.extractMessage(from: data, defaultMessage: "The server encountered an issue.")
-                    throw NetworkError.serverError(message)
-                }
-                
-                return ()
-            }
-            .eraseToAnyPublisher()
+    func deleteTransaction(id: Int) -> AnyPublisher<AppDashboard, Error> {
+        return request("/transactions/\(id)", method: "DELETE")
     }
 
-    func updateTransactionCategory(id: Int, categoryName: String) -> AnyPublisher<Transaction, Error> {
+    func updateTransactionCategory(id: Int, categoryName: String) -> AnyPublisher<AppDashboard, Error> {
         return request("/transactions/\(id)/category?categoryName=\(categoryName)", method: "PATCH")
     }
 
-    func updateTransactionStatus(id: Int, status: String) -> AnyPublisher<Transaction, Error> {
+    func updateTransactionStatus(id: Int, status: String) -> AnyPublisher<AppDashboard, Error> {
         return request("/transactions/\(id)/status?status=\(status)", method: "PATCH")
     }
 
@@ -220,7 +192,7 @@ class NetworkService: NetworkServiceProtocol {
         return request("/user/profile")
     }
 
-    func updateProfile(_ profile: UserProfile) -> AnyPublisher<UserProfile, Error> {
+    func updateProfile(_ profile: UserProfile) -> AnyPublisher<AppDashboard, Error> {
         guard let data = try? AppCoder.jsonEncoder.encode(profile) else {
             return Fail(error: NetworkError.decodingError).eraseToAnyPublisher()
         }
@@ -231,43 +203,15 @@ class NetworkService: NetworkServiceProtocol {
         return request("/categories")
     }
 
-    func createCategory(_ category: UserCategory) -> AnyPublisher<UserCategory, Error> {
+    func createCategory(_ category: UserCategory) -> AnyPublisher<AppDashboard, Error> {
         guard let data = try? AppCoder.jsonEncoder.encode(category) else {
             return Fail(error: NetworkError.decodingError).eraseToAnyPublisher()
         }
         return request("/categories", method: "POST", body: data)
     }
 
-    func deleteCategory(id: Int) -> AnyPublisher<Void, Error> {
-        guard let url = URL(string: "\(baseURL)/categories/\(id)") else {
-            return Fail(error: NetworkError.invalidURL).eraseToAnyPublisher()
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-        
-        if let token = authToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        return URLSession.shared.dataTaskPublisher(for: request)
-            .tryMap { data, response in
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    throw NetworkError.serverError("We're having trouble connecting to our servers.")
-                }
-                
-                if httpResponse.statusCode == 401 {
-                    throw NetworkError.unauthorized
-                }
-                
-                guard (200...299).contains(httpResponse.statusCode) else {
-                    let message = self.extractMessage(from: data, defaultMessage: "The server encountered an issue.")
-                    throw NetworkError.serverError(message)
-                }
-                
-                return ()
-            }
-            .eraseToAnyPublisher()
+    func deleteCategory(id: Int) -> AnyPublisher<AppDashboard, Error> {
+        return request("/categories/\(id)", method: "DELETE")
     }
 
     func fetchStats() -> AnyPublisher<BackendStats, Error> {
@@ -304,43 +248,15 @@ class NetworkService: NetworkServiceProtocol {
         return request("/recurring")
     }
 
-    func createRecurringTransaction(_ transaction: RecurringTransaction) -> AnyPublisher<RecurringTransaction, Error> {
+    func createRecurringTransaction(_ transaction: RecurringTransaction) -> AnyPublisher<AppDashboard, Error> {
         guard let data = try? AppCoder.jsonEncoder.encode(transaction) else {
             return Fail(error: NetworkError.decodingError).eraseToAnyPublisher()
         }
         return request("/recurring", method: "POST", body: data)
     }
 
-    func deleteRecurringTransaction(id: String) -> AnyPublisher<Void, Error> {
-        guard let url = URL(string: "\(baseURL)/recurring/\(id)") else {
-            return Fail(error: NetworkError.invalidURL).eraseToAnyPublisher()
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-        
-        if let token = authToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        return URLSession.shared.dataTaskPublisher(for: request)
-            .tryMap { data, response in
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    throw NetworkError.serverError("We're having trouble connecting to our servers.")
-                }
-                
-                if httpResponse.statusCode == 401 {
-                    throw NetworkError.unauthorized
-                }
-                
-                guard (200...299).contains(httpResponse.statusCode) else {
-                    let message = self.extractMessage(from: data, defaultMessage: "The server encountered an issue.")
-                    throw NetworkError.serverError(message)
-                }
-                
-                return ()
-            }
-            .eraseToAnyPublisher()
+    func deleteRecurringTransaction(id: String) -> AnyPublisher<AppDashboard, Error> {
+        return request("/recurring/\(id)", method: "DELETE")
     }
 }
 

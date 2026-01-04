@@ -2,6 +2,7 @@ import SwiftUI
 import Combine
 
 class AppViewModel: ObservableObject {
+    // MARK: - State
     @Published var transactions: [Transaction] = []
     @Published var pendingTransactions: [Transaction] = []
     @Published var totalSpentThisMonth: Double = 0
@@ -9,8 +10,8 @@ class AppViewModel: ObservableObject {
     @Published var dailyInsight: DailyInsight = DailyInsight(allowance: 0, isOverPace: false, paceDifference: 0)
     @Published var categories: [UserCategory] = []
     @Published var recurringTransactions: [RecurringTransaction] = []
-    
     @Published var profile: UserProfile
+    @Published var isAuthenticated = false
     @Published var isLoading = false
     @Published var errorMessage: String? {
         didSet {
@@ -20,25 +21,20 @@ class AppViewModel: ObservableObject {
         }
     }
     @Published var showErrorAlert = false
-    @Published var isAuthenticated = false
     
-    var currencySymbol: String {
-        profile.currency.rawValue
-    }
+    // MARK: - Managers (SRP)
+    private let state: AppState
+    private let transactionManager: TransactionManager
+    private let categoryManager: CategoryManager
+    private let profileManager: ProfileManager
+    private let syncManager: SyncManager
+    private let analyticsManager: AnalyticsManager
     
-    func formatCurrency(_ amount: Double) -> String {
-        Theme.formatCurrency(amount, symbol: currencySymbol)
-    }
-    
-    private let storageService: StorageServiceProtocol
-    private let paymentService: PaymentServiceProtocol
-    private let networkService: NetworkServiceProtocol
+    // MARK: - Utilities
     private let upiParser: UPIParserProtocol
-    private let analyticsEngine: AnalyticsEngineProtocol
-    private let sessionManager: SessionManagerProtocol
+    private var cancellables = Set<AnyCancellable>()
     
-    var cancellables = Set<AnyCancellable>()
-    private var idMap: [String: String] = [:] // tempId -> realId mapping
+    var currencySymbol: String { profile.currency.rawValue }
     
     init(storageService: StorageServiceProtocol = StorageService(), 
          paymentService: PaymentServiceProtocol = UPIPaymentService(),
@@ -47,473 +43,133 @@ class AppViewModel: ObservableObject {
          analyticsEngine: AnalyticsEngineProtocol = AnalyticsEngine(),
          sessionManager: SessionManagerProtocol = SessionManager.shared,
          initialDashboard: AppDashboard? = nil) {
-        self.storageService = storageService
-        self.paymentService = paymentService
-        self.networkService = networkService
+        
         self.upiParser = upiParser
-        self.analyticsEngine = analyticsEngine
-        self.sessionManager = sessionManager
         
-        // 1. Load from local cache first
-        self.transactions = storageService.loadTransactions()
-        self.categories = storageService.loadCategories()
-        self.profile = storageService.loadProfile()
+        // 1. Initialize State
+        let initialProfile = storageService.loadProfile()
+        let appState = AppState(profile: initialProfile)
+        appState.transactions = storageService.loadTransactions()
+        appState.categories = storageService.loadCategories()
+        appState.recurringTransactions = storageService.loadRecurringTransactions()
+        appState.isAuthenticated = sessionManager.isAuthenticated
+        self.state = appState
+        self.profile = initialProfile // Initial sync
         
-        self.isAuthenticated = sessionManager.isAuthenticated
+        // 2. Initialize Managers
+        self.transactionManager = TransactionManager(state: appState, networkService: networkService, storageService: storageService, paymentService: paymentService)
+        self.categoryManager = CategoryManager(state: appState, networkService: networkService, storageService: storageService)
+        self.profileManager = ProfileManager(state: appState, networkService: networkService, storageService: storageService, sessionManager: sessionManager)
+        self.syncManager = SyncManager(state: appState, networkService: networkService, storageService: storageService)
+        self.analyticsManager = AnalyticsManager(state: appState, analyticsEngine: analyticsEngine)
         
-        setupBindings()
+        // 3. Setup Bindings (State -> ViewModel)
+        setupStateBindings()
         
-        // 2. If we received a dashboard immediately from login, apply it now
+        // 4. Setup Manager Callbacks
+        let applyDashboardClosure: (AppDashboard) -> Void = { [weak self] dashboard in
+            self?.syncManager.applyDashboard(dashboard)
+        }
+        
+        self.transactionManager.onDashboardReceived = applyDashboardClosure
+        self.categoryManager.onDashboardReceived = applyDashboardClosure
+        self.profileManager.onDashboardReceived = applyDashboardClosure
+        
+        // 5. Initial Data Loading
         if let dashboard = initialDashboard {
-            applyDashboard(dashboard)
+            syncManager.applyDashboard(dashboard)
         }
         
-        // 3. Sync with backend for any fresh changes
-        if isAuthenticated {
-            syncWithBackend()
+        if appState.isAuthenticated {
+            syncManager.syncWithBackend()
         }
     }
     
-    private func setupBindings() {
-        // Automatically update pending transactions whenever transactions change
-        $transactions
-            .map { $0.filter { $0.status == .pending } }
-            .assign(to: &$pendingTransactions)
+    private func setupStateBindings() {
+        state.$transactions.assign(to: &$transactions)
+        state.$pendingTransactions.assign(to: &$pendingTransactions)
+        state.$totalSpentThisMonth.assign(to: &$totalSpentThisMonth)
+        state.$topThreeSpends.assign(to: &$topThreeSpends)
+        state.$dailyInsight.assign(to: &$dailyInsight)
+        state.$categories.assign(to: &$categories)
+        state.$recurringTransactions.assign(to: &$recurringTransactions)
+        state.$profile.assign(to: &$profile)
+        state.$isAuthenticated.assign(to: &$isAuthenticated)
+        state.$isLoading.assign(to: &$isLoading)
+        state.$errorMessage.assign(to: &$errorMessage)
+        state.$showErrorAlert.assign(to: &$showErrorAlert)
     }
     
-    func syncWithBackend() {
-        guard isAuthenticated else { return }
-        
-        let calendar = Calendar.current
-        let now = Date()
-        
-        // Start of current month
-        let startComponents = calendar.dateComponents([.year, .month], from: now)
-        guard let startDate = calendar.date(from: startComponents) else { return }
-        
-        // End of current month
-        var endComponents = DateComponents()
-        endComponents.month = 1
-        endComponents.second = -1
-        guard let endDate = calendar.date(byAdding: endComponents, to: startDate) else { return }
-        
-        networkService.fetchDashboard(from: startDate, to: endDate)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] completion in
-                if case .failure(let error) = completion {
-                    self?.errorMessage = error.localizedDescription
-                    if (error as? NetworkError) == .unauthorized {
-                        self?.logout()
-                    }
-                }
-            } receiveValue: { [weak self] dashboard in
-                self?.applyDashboard(dashboard)
-            }
-            .store(in: &cancellables)
-            
-        fetchRecurringTransactions()
-    }
-
-    func fetchRecurringTransactions() {
-        networkService.fetchRecurringTransactions()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] completion in
-                if case .failure(let error) = completion {
-                    print("Failed to fetch recurring: \(error)")
-                }
-            } receiveValue: { [weak self] recurring in
-                self?.recurringTransactions = recurring
-            }
-            .store(in: &cancellables)
-    }
-
-    func addRecurringTransaction(merchantName: String, amount: String, categoryName: String, frequency: RecurrenceFrequency, startDate: Date) {
-        let doubleAmount = Double(amount) ?? 0.0
-        
-        // Validation: Don't save if amount is 0
-        guard doubleAmount > 0 else {
-            errorMessage = "Please enter an amount greater than zero."
-            return
-        }
-        
-        let newRecurring = RecurringTransaction(
-            merchantName: merchantName,
-            amount: doubleAmount,
-            categoryName: categoryName,
-            frequency: frequency,
-            nextDueDate: startDate
-        )
-        
-        networkService.createRecurringTransaction(newRecurring)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] completion in
-                if case .failure(let error) = completion {
-                    self?.errorMessage = error.localizedDescription
-                }
-            } receiveValue: { [weak self] saved in
-                self?.recurringTransactions.append(saved)
-            }
-            .store(in: &cancellables)
-    }
-
-    func deleteRecurringTransaction(id: String) {
-        networkService.deleteRecurringTransaction(id: id)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] completion in
-                if case .failure(let error) = completion {
-                    self?.errorMessage = error.localizedDescription
-                }
-            } receiveValue: { [weak self] _ in
-                self?.recurringTransactions.removeAll(where: { $0.id == id })
-            }
-            .store(in: &cancellables)
-    }
-
-    func applyDashboard(_ dashboard: AppDashboard) {
-        self.objectWillChange.send()
-        
-        if self.transactions != dashboard.transactions { self.transactions = dashboard.transactions }
-        
-        // Merge or replace categories carefully
-        if self.categories != dashboard.categories {
-            self.categories = dashboard.categories
-        }
-        
-        self.profile = dashboard.profile
-        
-        self.totalSpentThisMonth = dashboard.stats.totalSpentThisMonth
-        self.topThreeSpends = dashboard.stats.topThreeSpends
-        self.dailyInsight = dashboard.stats.dailyInsight
-        
-        self.isAuthenticated = true
-        
-        saveTransactions()
-        saveCategories()
-        storageService.saveProfile(profile)
-    }
-
-    func logout() {
-        sessionManager.clearSession()
-        isAuthenticated = false
-        transactions = []
-        categories = UserCategory.defaults
+    // MARK: - Public API (Delegation)
+    
+    func formatCurrency(_ amount: Double) -> String {
+        Theme.formatCurrency(amount, symbol: currencySymbol)
     }
     
-    func saveTransactions() {
-        storageService.saveTransactions(transactions)
-    }
+    func syncWithBackend() { syncManager.syncWithBackend() }
     
-    func saveCategories() {
-        storageService.saveCategories(categories)
-    }
-
-    func saveProfile() {
-        storageService.saveProfile(profile)
-        networkService.updateProfile(profile)
-            .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { [weak self] completion in
-                if case .failure(let error) = completion {
-                    self?.errorMessage = error.localizedDescription
-                }
-            }, receiveValue: { _ in })
-            .store(in: &cancellables)
-    }
+    func logout() { profileManager.logout() }
+    
+    func saveProfile() { profileManager.saveProfile() }
     
     @discardableResult
     func initiatePayment(merchantName: String, amount: String, categoryName: String, url: String, app: String) -> String {
-        let tempId = UUID().uuidString
-        let doubleAmount = Double(amount) ?? 0.0
-        let newTxn = Transaction(id: tempId,
-                               merchantName: merchantName, 
-                               amount: doubleAmount, 
-                               date: Date(), 
-                               status: .pending, 
-                               categoryName: categoryName)
-        
-        self.transactions.insert(newTxn, at: 0)
-        
-        networkService.createTransaction(newTxn)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] completion in
-                if case .failure = completion {
-                    self?.transactions.removeAll(where: { $0.id == tempId })
-                }
-            } receiveValue: { [weak self] savedTxn in
-                self?.idMap[tempId] = savedTxn.id
-                
-                var finalTxn = savedTxn
-                if let localIndex = self?.transactions.firstIndex(where: { $0.id == tempId }),
-                   self?.transactions[localIndex].status == .success {
-                    finalTxn.status = .success
-                    if let realId = Int(savedTxn.id) {
-                        self?.networkService.updateTransactionStatus(id: realId, status: AppConstants.TransactionStatus.success.rawValue)
-                            .sink(receiveCompletion: { _ in }, receiveValue: { _ in })
-                            .store(in: &(self!.cancellables))
-                    }
-                }
-
-                if let index = self?.transactions.firstIndex(where: { $0.id == tempId }) {
-                    self?.transactions[index] = finalTxn
-                }
-                self?.saveTransactions()
-            }
-            .store(in: &cancellables)
-
-        paymentService.openDirectApp(url: url, amount: amount, app: app)
-        return tempId
+        transactionManager.initiatePayment(merchantName: merchantName, amount: amount, categoryName: categoryName, url: url, app: app)
     }
     
     func confirmTransaction(_ id: String, finalAmount: Double? = nil) {
-        let currentId = idMap[id] ?? id
-        if let index = transactions.firstIndex(where: { $0.id == currentId }) {
-            let amountToSave = finalAmount ?? transactions[index].amount
-            
-            // Validation: Don't save if amount is 0
-            guard amountToSave > 0 else {
-                errorMessage = "Transaction amount must be greater than zero."
-                return
-            }
-            
-            transactions[index].amount = amountToSave
-            transactions[index].status = .success
-            saveTransactions()
-            
-            if let intId = Int(currentId) {
-                let status = AppConstants.TransactionStatus.success.rawValue
-                networkService.updateTransactionStatus(id: intId, status: status)
-                    .receive(on: DispatchQueue.main)
-                    .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] _ in
-                        self?.refreshStats()
-                    })
-                    .store(in: &cancellables)
-            }
-        }
+        transactionManager.confirmTransaction(id, finalAmount: finalAmount)
     }
     
     func rejectTransaction(_ id: String) {
-        let currentId = idMap[id] ?? id
-        if let index = transactions.firstIndex(where: { $0.id == currentId }) {
-            transactions[index].status = .failure
-            saveTransactions()
-            
-            if let intId = Int(currentId) {
-                networkService.updateTransactionStatus(id: intId, status: AppConstants.TransactionStatus.failure.rawValue)
-                    .receive(on: DispatchQueue.main)
-                    .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] _ in
-                        self?.refreshStats()
-                    })
-                    .store(in: &cancellables)
-            }
-        }
+        transactionManager.rejectTransaction(id)
     }
     
     func deleteTransaction(_ id: String) {
-        let currentId = idMap[id] ?? id
-        transactions.removeAll(where: { $0.id == id || $0.id == currentId })
-        saveTransactions()
-        
-        if let intId = Int(currentId) {
-            networkService.deleteTransaction(id: intId)
-                .receive(on: DispatchQueue.main)
-                .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] _ in
-                    self?.refreshStats()
-                })
-                .store(in: &cancellables)
-        } else {
-            refreshStats()
-        }
-    }
-    
-    func addCategory(name: String, icon: String) {
-        let newCat = UserCategory(name: name, icon: icon, type: "EXPENSE")
-        
-        networkService.createCategory(newCat)
-            .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { [weak self] completion in
-                if case .failure(let error) = completion {
-                    self?.errorMessage = error.localizedDescription
-                }
-            }, receiveValue: { [weak self] savedCat in
-                self?.categories.append(savedCat)
-                self?.saveCategories()
-            })
-            .store(in: &cancellables)
-    }
-    
-    func deleteCategory(at offsets: IndexSet) {
-        for index in offsets {
-            let category = categories[index]
-            if let id = category.id {
-                networkService.deleteCategory(id: id)
-                    .receive(on: DispatchQueue.main)
-                    .sink(receiveCompletion: { _ in }, receiveValue: { _ in })
-                    .store(in: &cancellables)
-            }
-            moveTransactions(from: category.name, to: AppConstants.Category.unassigned)
-        }
-        categories.remove(atOffsets: offsets)
-        saveCategories()
-    }
-    
-    func deleteCategory(id: Int?, replacementCategoryName: String? = nil) {
-        guard let id = id else { return }
-        if let category = categories.first(where: { $0.id == id }) {
-            networkService.deleteCategory(id: id)
-                .receive(on: DispatchQueue.main)
-                .sink(receiveCompletion: { _ in }, receiveValue: { _ in })
-                .store(in: &cancellables)
-                
-            let targetName = replacementCategoryName ?? AppConstants.Category.unassigned
-            moveTransactions(from: category.name, to: targetName)
-            categories.removeAll(where: { $0.id == id })
-            saveCategories()
-        }
-    }
-    
-    func moveTransactions(from oldName: String, to newName: String) {
-        var modified = false
-        for i in 0..<transactions.count {
-            if transactions[i].categoryName == oldName {
-                transactions[i].categoryName = newName
-                modified = true
-            }
-        }
-        if modified {
-            saveTransactions()
-        }
-    }
-    
-    func countTransactions(for categoryName: String) -> Int {
-        transactions.filter { $0.categoryName == categoryName }.count
-    }
-    
-    func updateTransactionCategory(id: String, newCategoryName: String) {
-        if let index = transactions.firstIndex(where: { $0.id == id }) {
-            transactions[index].categoryName = newCategoryName
-            saveTransactions()
-            
-            if let intId = Int(id) {
-                networkService.updateTransactionCategory(id: intId, categoryName: newCategoryName)
-                    .receive(on: DispatchQueue.main)
-                    .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] _ in
-                        self?.refreshStats()
-                    })
-                    .store(in: &cancellables)
-            }
-        }
+        transactionManager.deleteTransaction(id)
     }
     
     func addManualTransaction(merchantName: String, amount: String, categoryName: String, date: Date) {
-        let tempId = UUID().uuidString
-        let doubleAmount = Double(amount) ?? 0.0
-        
-        // Validation: Don't save if amount is 0
-        guard doubleAmount > 0 else {
-            errorMessage = "Please enter an amount greater than zero."
-            return
-        }
-        
-        let newTxn = Transaction(
-            id: tempId,
-            merchantName: merchantName,
-            amount: doubleAmount,
-            date: date,
-            status: .success,
-            categoryName: categoryName
-        )
-        
-        self.transactions.insert(newTxn, at: 0)
-        
-        networkService.createTransaction(newTxn)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] completion in
-                if case .failure = completion {
-                    self?.transactions.removeAll(where: { $0.id == tempId })
-                }
-            } receiveValue: { [weak self] savedTxn in
-                self?.idMap[tempId] = savedTxn.id
-                if let index = self?.transactions.firstIndex(where: { $0.id == tempId }) {
-                    self?.transactions[index] = savedTxn
-                }
-                self?.saveTransactions()
-                self?.refreshStats()
-            }
-            .store(in: &cancellables)
-    }
-
-    private func refreshStats() {
-        let calendar = Calendar.current
-        let now = Date()
-        let startComponents = calendar.dateComponents([.year, .month], from: now)
-        guard let startDate = calendar.date(from: startComponents) else { return }
-        
-        var endComponents = DateComponents()
-        endComponents.month = 1
-        endComponents.second = -1
-        guard let endDate = calendar.date(byAdding: endComponents, to: startDate) else { return }
-
-        networkService.fetchDashboard(from: startDate, to: endDate)
-            .receive(on: DispatchQueue.main)
-            .sink { completion in
-                if case .failure(let error) = completion {
-                    print("Dashboard refresh failed: \(error)")
-                }
-            } receiveValue: { [weak self] dashboard in
-                self?.applyDashboard(dashboard)
-            }
-            .store(in: &cancellables)
+        transactionManager.addManualTransaction(merchantName: merchantName, amount: amount, categoryName: categoryName, date: date)
     }
     
-    func parseUPI(url: String, key: String) -> String? {
-        upiParser.parseUPI(url: url, key: key)
-    }
-
-    func validateQR(url: String) -> QRType {
-        upiParser.validateQR(url: url)
-    }
-
-    func getBestPayeeName(from url: String) -> String {
-        upiParser.getBestPayeeName(from: url)
+    func addCategory(name: String, icon: String) {
+        categoryManager.addCategory(name: name, icon: icon)
     }
     
-    // MARK: - Category Analytics
-
-    enum AnalysisPeriod: String, CaseIterable, Identifiable {
-        case week = "Week"
-        case month = "Month"
-        case year = "Year"
-        
-        var id: String { self.rawValue }
+    func deleteCategory(at offsets: IndexSet) {
+        categoryManager.deleteCategory(at: offsets)
+    }
+    
+    func deleteCategory(id: Int?, replacementCategoryName: String? = nil) {
+        categoryManager.deleteCategory(id: id, replacementCategoryName: replacementCategoryName)
+    }
+    
+    func updateTransactionCategory(id: String, newCategoryName: String) {
+        categoryManager.updateTransactionCategory(id: id, newCategoryName: newCategoryName)
+    }
+    
+    func countTransactions(for categoryName: String) -> Int {
+        categoryManager.countTransactions(for: categoryName)
+    }
+    
+    func addRecurringTransaction(merchantName: String, amount: String, categoryName: String, frequency: RecurrenceFrequency, startDate: Date) {
+        syncManager.addRecurringTransaction(merchantName: merchantName, amount: amount, categoryName: categoryName, frequency: frequency, startDate: startDate)
+    }
+    
+    func deleteRecurringTransaction(id: String) {
+        syncManager.deleteRecurringTransaction(id: id)
     }
     
     func categorySpending(for period: AnalysisPeriod) -> [CategorySpending] {
-        analyticsEngine.calculateCategorySpending(transactions: transactions, categories: categories, period: period)
+        analyticsManager.categorySpending(for: period)
     }
     
     func groupedCategorySpending(for period: AnalysisPeriod) -> [CategorySpending] {
-        let allSpending = categorySpending(for: period)
-        if allSpending.count <= 5 { return allSpending }
-        
-        let topFive = Array(allSpending.prefix(5))
-        let remaining = allSpending.dropFirst(5)
-        
-        let othersTotal = remaining.reduce(0) { $0 + $1.totalAmount }
-        let othersPercentage = remaining.reduce(0) { $0 + $1.percentage }
-        
-        let others = CategorySpending(
-            categoryName: "Others",
-            totalAmount: othersTotal,
-            percentage: othersPercentage,
-            icon: "ellipsis.circle.fill"
-        )
-        
-        var finalResult = topFive
-        finalResult.append(others)
-        return finalResult
+        analyticsManager.groupedCategorySpending(for: period)
     }
     
-    var categorySpendingThisMonth: [CategorySpending] {
-        categorySpending(for: .month)
-    }
+    func parseUPI(url: String, key: String) -> String? { upiParser.parseUPI(url: url, key: key) }
+    func validateQR(url: String) -> QRType { upiParser.validateQR(url: url) }
+    func getBestPayeeName(from url: String) -> String { upiParser.getBestPayeeName(from: url) }
 }
-

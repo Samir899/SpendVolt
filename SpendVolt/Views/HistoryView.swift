@@ -4,7 +4,7 @@ import Charts
 struct HistoryView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var showingAnalytics = false
-    @State private var selectedPeriod: AppViewModel.AnalysisPeriod = .month
+    @State private var selectedPeriod: AnalysisPeriod = .month
     @State private var transactionToDelete: String?
     @State private var isShowingDeleteConfirmation = false
     @State private var showOnlySuccess = false

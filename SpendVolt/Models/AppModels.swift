@@ -25,5 +25,14 @@ struct AppDashboard: Codable {
     let categories: [UserCategory]
     let profile: UserProfile
     let stats: BackendStats
+    let recurringTransactions: [RecurringTransaction]
+}
+
+enum AnalysisPeriod: String, CaseIterable, Identifiable {
+    case week = "Week"
+    case month = "Month"
+    case year = "Year"
+    
+    var id: String { self.rawValue }
 }
 

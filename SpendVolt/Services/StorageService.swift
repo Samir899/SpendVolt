@@ -16,12 +16,18 @@ protocol ProfileStorage {
     func loadProfile() -> UserProfile
 }
 
-protocol StorageServiceProtocol: TransactionStorage, CategoryStorage, ProfileStorage {}
+protocol RecurringTransactionStorage {
+    func saveRecurringTransactions(_ transactions: [RecurringTransaction])
+    func loadRecurringTransactions() -> [RecurringTransaction]
+}
+
+protocol StorageServiceProtocol: TransactionStorage, CategoryStorage, ProfileStorage, RecurringTransactionStorage {}
 
 class StorageService: StorageServiceProtocol {
     private let transactionsKey = AppConstants.Storage.transactions
     private let categoriesKey = AppConstants.Storage.categories
     private let profileKey = AppConstants.Storage.profile
+    private let recurringTransactionsKey = AppConstants.Storage.recurringTransactions
     
     // ... existing saveTransactions/loadTransactions ...
     
@@ -67,6 +73,22 @@ class StorageService: StorageServiceProtocol {
         guard let data = UserDefaults.standard.data(forKey: profileKey),
               let decoded = try? JSONDecoder().decode(UserProfile.self, from: data) else {
             return UserProfile.default
+        }
+        return decoded
+    }
+
+    // MARK: - Recurring Transaction Storage
+    
+    func saveRecurringTransactions(_ transactions: [RecurringTransaction]) {
+        if let encoded = try? JSONEncoder().encode(transactions) {
+            UserDefaults.standard.set(encoded, forKey: recurringTransactionsKey)
+        }
+    }
+    
+    func loadRecurringTransactions() -> [RecurringTransaction] {
+        guard let data = UserDefaults.standard.data(forKey: recurringTransactionsKey),
+              let decoded = try? JSONDecoder().decode([RecurringTransaction].self, from: data) else {
+            return []
         }
         return decoded
     }

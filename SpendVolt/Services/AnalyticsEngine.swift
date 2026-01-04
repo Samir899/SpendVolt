@@ -4,7 +4,7 @@ protocol AnalyticsEngineProtocol {
     func calculateTotalSpent(transactions: [Transaction], month: Int, year: Int) -> Double
     func calculateTopSpends(transactions: [Transaction], month: Int, year: Int, limit: Int) -> [Transaction]
     func calculateDailyInsight(totalSpent: Double, budget: Double) -> DailyInsight
-    func calculateCategorySpending(transactions: [Transaction], categories: [UserCategory], period: AppViewModel.AnalysisPeriod) -> [CategorySpending]
+    func calculateCategorySpending(transactions: [Transaction], categories: [UserCategory], period: AnalysisPeriod) -> [CategorySpending]
 }
 
 class AnalyticsEngine: AnalyticsEngineProtocol {
@@ -55,7 +55,7 @@ class AnalyticsEngine: AnalyticsEngineProtocol {
         return DailyInsight(allowance: allowance, isOverPace: isOverPace, paceDifference: paceDifference)
     }
     
-    func calculateCategorySpending(transactions: [Transaction], categories: [UserCategory], period: AppViewModel.AnalysisPeriod) -> [CategorySpending] {
+    func calculateCategorySpending(transactions: [Transaction], categories: [UserCategory], period: AnalysisPeriod) -> [CategorySpending] {
         let calendar = Calendar.current
         let now = Date()
         

@@ -2,7 +2,7 @@ import SwiftUI
 import Charts
 
 struct AnalyticsSection: View {
-    @Binding var selectedPeriod: AppViewModel.AnalysisPeriod
+    @Binding var selectedPeriod: AnalysisPeriod
     let currencySymbol: String
     let fullSpendingData: [CategorySpending]
     let chartData: [CategorySpending]
@@ -12,7 +12,7 @@ struct AnalyticsSection: View {
         VStack(spacing: 24) {
             // Period Selector
             Picker("Period", selection: $selectedPeriod) {
-                ForEach(AppViewModel.AnalysisPeriod.allCases) { period in
+                ForEach(AnalysisPeriod.allCases) { period in
                     Text(period.rawValue).tag(period)
                 }
             }

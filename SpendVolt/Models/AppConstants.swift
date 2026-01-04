@@ -7,6 +7,7 @@ enum AppConstants {
         static let transactions = "saved_transactions"
         static let categories = "user_categories"
         static let profile = "user_profile"
+        static let recurringTransactions = "recurring_transactions"
     }
     
     enum TransactionStatus: String, Codable {
